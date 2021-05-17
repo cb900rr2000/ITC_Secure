@@ -5,21 +5,21 @@ parameters:
 - name: customer
   displayName: Customer
   type: string
-  default: No-Selection
+  default: PRD_No-Selection
   values:
-  - Coller_Capital
-  - Mizuho_International
-  - DAC_Beachcroft
-  - Gov_of_Jersey
-  - Park_Square_Capital
-  - 3i_Group
-  - C5_Capital
-  - Essentra
-  - Oxera_Consulting
-  - Doctors_Laboratory
-  - ITC_Secure
-  - Annington
-  - No_Selection
+  - PRD_Coller_Capital
+  - PRD_Mizuho_International
+  - PRD_DAC_Beachcroft
+  - PRD_Gov_of_Jersey
+  - PRD_Park_Square_Capital
+  - PRD_3i_Group
+  - PRD_C5_Capital
+  - PRD_Essentra
+  - PRD_Oxera_Consulting
+  - PRD_Doctors_Laboratory
+  - PRD_ITC_Secure
+  - PRD_Annington
+  - PRD_No-Selection
 
 name: build and deploy Alert Rules
 resources:
@@ -29,7 +29,7 @@ resources:
 trigger: 
  paths:
    include:
-     - NonCommonAlertRules/* 
+     - Alert_Rules/* 
 
 stages:
 - stage: build_alert_rules
@@ -43,7 +43,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: AnalyticsRules/${{parameters.customer}}
+          SourceFolder: Alert_Rules/Individual_Inbuilt_AM/${{parameters.customer}}
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:
@@ -76,6 +76,6 @@ stages:
         inputs:
          azureSubscription: '${{parameters.customer}}'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
-         ScriptArguments: '-Workspace $(Workspace) -RulesFile analytics-rules.json'
+         ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
