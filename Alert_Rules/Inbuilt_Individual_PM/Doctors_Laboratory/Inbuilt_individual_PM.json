@@ -1,0 +1,656 @@
+{
+    "Scheduled": [
+
+{
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet procList = dynamic([\"cmd.exe\",\"ftp.exe\",\"schtasks.exe\",\"powershell.exe\",\"rundll32.exe\",\"regsvr32.exe\",\"msiexec.exe\"]);\nlet ProcessCreationEvents=() {\nlet processEvents=SecurityEvent\n| where EventID==4688\n| where isnotempty(CommandLine)\n| project TimeGenerated, Computer, Account = SubjectUserName, AccountDomain = SubjectDomainName, NewProcessName,\nFileName = Process, CommandLine,  ParentProcessName;\nprocessEvents};\nProcessCreationEvents \n| where TimeGenerated >= ago(timeframe)\n| where FileName in~ (procList)\n| where CommandLine contains \":\\\\recycler\"\n| project StartTimeUtc = TimeGenerated, Computer, Account, NewProcessName, FileName, CommandLine, ParentProcessName\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Malware in the recycle bin",
+    "enabled": true,
+    "description": "Identifies malware that has been hidden in the recycle bin.\nReferences: https://azure.microsoft.com/blog/how-azure-security-center-helps-reveal-a-cyberattack/.",
+    "tactics": [
+      "DefenseEvasion"
+    ],
+    "alertRuleTemplateName": "75bf9902-0789-47c1-a5d8-f57046aa72df",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let starttime = 14d;\nlet endtime = 1d;\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), ConnectionCount = count() \nby Account = tolower(Account), Computer = toupper(Computer), IpAddress, AccountType, Activity, LogonTypeName, ProcessName\n// use left anti to exclude anything from the previous 14 days that is not rare\n| join kind=leftanti (\nSecurityEvent\n| where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where EventID == 4624\n| summarize by Computer = toupper(Computer), IpAddress, Account = tolower(Account)\n) on Account, Computer\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), ConnectionCount = sum(ConnectionCount)  \nby Account, Computer, IpAddress, AccountType, Activity, LogonTypeName, ProcessName\n| extend timestamp = StartTime, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Rare RDP Connections",
+    "enabled": true,
+    "description": "Identifies when an RDP connection is new or rare related to any logon type by a given account today based on comparison with the previous 14 days.\nRDP connections are indicated by the EventID 4624 with LogonType = 10",
+    "tactics": [
+      "LateralMovement"
+    ],
+    "alertRuleTemplateName": "45b903c5-6f56-4969-af10-ae62ac709718",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet endpointData = \n(SecurityEvent\n  | where TimeGenerated >= ago(timeframe) \n  | where EventID == 4688\n  | extend shortFileName = tostring(split(NewProcessName, '\\\\')[-1])\n  );\n// Correlate suspect executables seen in TrendMicro rule updates with similar activity on endpoints\nCommonSecurityLog\n| where TimeGenerated >= ago(timeframe)\n| where DeviceVendor =~ \"Trend Micro\"\n| where Activity =~ \"Deny List updated\" \n| where RequestURL endswith \".exe\"\n| project TimeGenerated, Activity , RequestURL , SourceIP, DestinationIP\n| extend suspectExeName = tolower(tostring(split(RequestURL, '/')[-1]))\n| join (endpointData) on $left.suspectExeName == $right.shortFileName \n| extend timestamp = TimeGenerated, IPCustomEntity = DestinationIP, AccountCustomEntity = TargetUserName, HostCustomEntity = Computer, URLCustomEntity = RequestURL",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Network endpoint to host executable correlation",
+    "enabled": true,
+    "description": "Correlates blocked URLs hosting [malicious] executables with host endpoint data\nto identify potential instances of executables of the same name having been recently run.",
+    "tactics": [
+      "Execution"
+    ],
+    "alertRuleTemplateName": "01f64465-b1ef-41ea-a7f5-31553a11ad43",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\n//Adjust this threshold to fit the environment\nlet signin_threshold = 5;\n//Make a list of all IPs with failed signins to AAD above our threshold\nlet suspicious_signins =\nSigninLogs\n| where TimeGenerated >= ago(timeframe)\n| where ResultType !in (\"0\", \"50125\", \"50140\")\n| where IPAddress != \"127.0.0.1\"\n| summarize count() by IPAddress\n| where count_ > signin_threshold\n| summarize make_list(IPAddress);\n//See if any of these IPs have sucessfully logged into *nix hosts\nlet linux_logons =\nSyslog\n| where TimeGenerated >= ago(timeframe)\n| where Facility contains \"auth\" and ProcessName != \"sudo\"\n| where SyslogMessage has \"Accepted\"\n| extend SourceIP = extract(\"(([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.(([0-9]{1,3})))\",1,SyslogMessage)\n| where SourceIP in (suspicious_signins)\n| extend Reason = \"Multiple failed AAD logins from IP address\"\n| project TimeGenerated, Computer, HostIP, IpAddress = SourceIP, SyslogMessage, Facility, ProcessName, Reason;\n//See if any of these IPs have sucessfully logged into Windows hosts\nlet win_logons =\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID == 4624\n| where LogonType in (10, 7, 3)\n| where IpAddress != \"-\"\n| where IpAddress in (suspicious_signins)\n| extend Reason = \"Multiple failed AAD logins from IP address\"\n| project TimeGenerated, Account, AccountType, Computer, Activity, EventID, LogonProcessName, IpAddress, LogonTypeName, TargetUserSid, Reason;\nunion isfuzzy=true linux_logons,win_logons\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, IPCustomEntity = IpAddress, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Failed AzureAD logons but success logon to host",
+    "enabled": true,
+    "description": "Identifies a list of IP addresses with a minimum number (default of 5) of failed logon attempts to Azure Active Directory.\nUses that list to identify any successful remote logons to hosts from these IPs within the same timeframe.",
+    "tactics": [
+      "InitialAccess",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "8ee967a2-a645-4832-85f4-72b635bcb3a6",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet regexEmpire = @\"SetDelay|GetDelay|Set-LostLimit|Get-LostLimit|Set-Killdate|Get-Killdate|Set-WorkingHours|Get-WorkingHours|Get-Sysinfo|Add-Servers|Invoke-ShellCommand|Start-AgentJob|Update-Profile|Get-FilePart|Encrypt-Bytes|Decrypt-Bytes|Encode-Packet|Decode-Packet|Send-Message|Process-Packet|Process-Tasking|Get-Task|Start-Negotiate|Invoke-DllInjection|Invoke-ReflectivePEInjection|Invoke-Shellcode|Invoke-ShellcodeMSIL|Get-ChromeDump|Get-ClipboardContents|Get-IndexedItem|Get-Keystrokes|Invoke-Inveigh|Invoke-NetRipper|local:Invoke-PatchDll|Invoke-NinjaCopy|Get-Win32Types|Get-Win32Constants|Get-Win32Functions|Sub-SignedIntAsUnsigned|Add-SignedIntAsUnsigned|Compare-Val1GreaterThanVal2AsUInt|Convert-UIntToInt|Test-MemoryRangeValid|Write-BytesToMemory|Get-DelegateType|Get-ProcAddress|Enable-SeDebugPrivilege|Invoke-CreateRemoteThread|Get-ImageNtHeaders|Get-PEBasicInfo|Get-PEDetailedInfo|Import-DllInRemoteProcess|Get-RemoteProcAddress|Copy-Sections|Update-MemoryAddresses|Import-DllImports|Get-VirtualProtectValue|Update-MemoryProtectionFlags|Update-ExeFunctions|Copy-ArrayOfMemAddresses|Get-MemoryProcAddress|Invoke-MemoryLoadLibrary|Invoke-MemoryFreeLibrary|Out-Minidump|Get-VaultCredential|Invoke-DCSync|Translate-Name|Get-NetDomain|Get-NetForest|Get-NetForestDomain|Get-DomainSearcher|Get-NetComputer|Get-NetGroupMember|Get-NetUser|Invoke-Mimikatz|Invoke-PowerDump|Invoke-TokenManipulation|Exploit-JMXConsole|Exploit-JBoss|Invoke-Thunderstruck|Invoke-VoiceTroll|Set-WallPaper|Invoke-PsExec|Invoke-SSHCommand|Invoke-PSInject|Invoke-RunAs|Invoke-SendMail|Invoke-Rule|Get-OSVersion|Select-EmailItem|View-Email|Get-OutlookFolder|Get-EmailItems|Invoke-MailSearch|Get-SubFolders|Get-GlobalAddressList|Invoke-SearchGAL|Get-SMTPAddress|Disable-SecuritySettings|Reset-SecuritySettings|Get-OutlookInstance|New-HoneyHash|Set-MacAttribute|Invoke-PatchDll|Get-SecurityPackages|Install-SSP|Invoke-BackdoorLNK|New-ElevatedPersistenceOption|New-UserPersistenceOption|Add-Persistence|Invoke-CallbackIEX|Add-PSFirewallRules|Invoke-EventLoop|Invoke-PortBind|Invoke-DNSLoop|Invoke-PacketKnock|Invoke-CallbackLoop|Invoke-BypassUAC|Get-DecryptedCpassword|Get-GPPInnerFields|Invoke-WScriptBypassUAC|Get-ModifiableFile|Get-ServiceUnquoted|Get-ServiceFilePermission|Get-ServicePermission|Invoke-ServiceUserAdd|Invoke-ServiceCMD|Write-UserAddServiceBinary|Write-CMDServiceBinary|Write-ServiceEXE|Write-ServiceEXECMD|Restore-ServiceEXE|Invoke-ServiceStart|Invoke-ServiceStop|Invoke-ServiceEnable|Invoke-ServiceDisable|Get-ServiceDetail|Find-DLLHijack|Find-PathHijack|Write-HijackDll|Get-RegAlwaysInstallElevated|Get-RegAutoLogon|Get-VulnAutoRun|Get-VulnSchTask|Get-UnattendedInstallFile|Get-Webconfig|Get-ApplicationHost|Write-UserAddMSI|Invoke-AllChecks|Invoke-ThreadedFunction|Test-Login|Get-UserAgent|Test-Password|Get-ComputerDetails|Find-4648Logons|Find-4624Logons|Find-AppLockerLogs|Find-PSScriptsInPSAppLog|Find-RDPClientConnections|Get-SystemDNSServer|Invoke-Paranoia|Invoke-WinEnum{|Get-SPN|Invoke-ARPScan|Invoke-Portscan|Invoke-ReverseDNSLookup|Invoke-SMBScanner|New-InMemoryModule|Add-Win32Type|Export-PowerViewCSV|Get-MacAttribute|Copy-ClonedFile|Get-IPAddress|Convert-NameToSid|Convert-SidToName|Convert-NT4toCanonical|Get-Proxy|Get-PathAcl|Get-NameField|Convert-LDAPProperty|Get-NetDomainController|Add-NetUser|Add-NetGroupUser|Get-UserProperty|Find-UserField|Get-UserEvent|Get-ObjectAcl|Add-ObjectAcl|Invoke-ACLScanner|Get-GUIDMap|Get-ADObject|Set-ADObject|Get-ComputerProperty|Find-ComputerField|Get-NetOU|Get-NetSite|Get-NetSubnet|Get-DomainSID|Get-NetGroup|Get-NetFileServer|SplitPath|Get-DFSshare|Get-DFSshareV1|Get-DFSshareV2|Get-GptTmpl|Get-GroupsXML|Get-NetGPO|Get-NetGPOGroup|Find-GPOLocation|Find-GPOComputerAdmin|Get-DomainPolicy|Get-NetLocalGroup|Get-NetShare|Get-NetLoggedon|Get-NetSession|Get-NetRDPSession|Invoke-CheckLocalAdminAccess|Get-LastLoggedOn|Get-NetProcess|Find-InterestingFile|Invoke-CheckWrite|Invoke-UserHunter|Invoke-StealthUserHunter|Invoke-ProcessHunter|Invoke-EventHunter|Invoke-ShareFinder|Invoke-FileFinder|Find-LocalAdminAccess|Get-ExploitableSystem|Invoke-EnumerateLocalAdmin|Get-NetDomainTrust|Get-NetForestTrust|Find-ForeignUser|Find-ForeignGroup|Invoke-MapDomainTrust|Get-Hex|Create-RemoteThread|Get-FoxDump|Decrypt-CipherText|Get-Screenshot|Start-HTTP-Server|Local:Invoke-CreateRemoteThread|Local:Get-Win32Functions|Local:Inject-NetRipper|GetCommandLine|ElevatePrivs|Get-RegKeyClass|Get-BootKey|Get-HBootKey|Get-UserName|Get-UserHashes|DecryptHashes|DecryptSingleHash|Get-UserKeys|DumpHashes|Enable-SeAssignPrimaryTokenPrivilege|Enable-Privilege|Set-DesktopACLs|Set-DesktopACLToAllowEveryone|Get-PrimaryToken|Get-ThreadToken|Get-TokenInformation|Get-UniqueTokens|Find-GPOLocation|Find-GPOComputerAdmin|Get-DomainPolicy|Get-NetLocalGroup|Get-NetShare|Get-NetLoggedon|Get-NetSession|Get-NetRDPSession|Invoke-CheckLocalAdminAccess|Get-LastLoggedOn|Get-NetProcess|Find-InterestingFile|Invoke-CheckWrite|Invoke-UserHunter|Invoke-StealthUserHunter|Invoke-ProcessHunter|Invoke-EventHunter|Invoke-ShareFinder|Invoke-FileFinder|Find-LocalAdminAccess|Get-ExploitableSystem|Invoke-EnumerateLocalAdmin|Get-NetDomainTrust|Get-NetForestTrust|Find-ForeignUser|Find-ForeignGroup|Invoke-MapDomainTrust|Get-Hex|Create-RemoteThread|Get-FoxDump|Decrypt-CipherText|Get-Screenshot|Start-HTTP-Server|Local:Invoke-CreateRemoteThread|Local:Get-Win32Functions|Local:Inject-NetRipper|GetCommandLine|ElevatePrivs|Get-RegKeyClass|Get-BootKey|Get-HBootKey|Get-UserName|Get-UserHashes|DecryptHashes|DecryptSingleHash|Get-UserKeys|DumpHashes|Enable-SeAssignPrimaryTokenPrivilege|Enable-Privilege|Set-DesktopACLs|Set-DesktopACLToAllowEveryone|Get-PrimaryToken|Get-ThreadToken|Get-TokenInformation|Get-UniqueTokens|Invoke-ImpersonateUser|Create-ProcessWithToken|Free-AllTokens|Enum-AllTokens|Invoke-RevertToSelf|Set-Speaker(\\$Volume){\\$wshShell|Local:Get-RandomString|Local:Invoke-PsExecCmd|Get-GPPPassword|Local:Inject-BypassStuff|Local:Invoke-CopyFile\\(\\$sSource,|ind-Fruit|New-IPv4Range|New-IPv4RangeFromCIDR|Parse-Hosts|Parse-ILHosts|Exclude-Hosts|Get-TopPort|Parse-Ports|Parse-IpPorts|Remove-Ports|Write-PortscanOut|Convert-SwitchtoBool|Get-ForeignUser|Get-ForeignGroup\";\nlet ProcessCreationEvents=() {\nlet processEvents=SecurityEvent\n| where EventID==4688\n| where isnotempty(CommandLine)\n| project TimeGenerated, Computer, Account = SubjectUserName, AccountDomain = SubjectDomainName, FileName = Process, CommandLine, ParentProcessName;\nprocessEvents};\nlet decodedPS = ProcessCreationEvents\n| where TimeGenerated >= ago(timeframe) \n| where CommandLine contains \" -encodedCommand\"\n| parse kind=regex flags=i CommandLine with * \"-EncodedCommand \" encodedCommand\n| project StartTimeUtc = TimeGenerated, encodedCommand = tostring(split(encodedCommand, ' ')[0]), CommandLine\n// Note: currently the base64_decodestring function is limited to supporting UTF8\n| extend decodedCommand = translate('\\0','', base64_decodestring(substring(encodedCommand, 0, strlen(encodedCommand) -  (strlen(encodedCommand) %8)))), encodedCommand, CommandLine , strlen(encodedCommand);\n(decodedPS\n| union \n(ProcessCreationEvents\n| where TimeGenerated >= ago(timeframe)\n| where FileName in~ (\"powershell.exe\",\"powershell_ise.exe\")\n| where CommandLine !contains \"-encodedcommand\")\n| extend StartTimeUtc = TimeGenerated\n)\n| where CommandLine matches regex regexEmpire\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Powershell Empire cmdlets seen in command line",
+    "enabled": true,
+    "description": "Identifies instances of PowerShell Empire cmdlets in powershell process command line data.",
+    "tactics": [
+      "Execution",
+      "Persistence"
+    ],
+    "alertRuleTemplateName": "ef88eb96-861c-43a0-ab16-f3835a97c928",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet ProcessCreationEvents=() {\nlet processEvents=SecurityEvent\n| where EventID==4688\n| where isnotempty(CommandLine)\n| project TimeGenerated, Computer, Account = SubjectUserName, AccountDomain = SubjectDomainName, FileName = Process, CommandLine, ParentProcessName;\nprocessEvents;\n};\nProcessCreationEvents \n| where TimeGenerated > ago(timeframe) \n| where CommandLine contains \".decode('base64')\"\n        or CommandLine contains \"base64 --decode\"\n        or CommandLine contains \".decode64(\" \n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), CountToday = count() by Computer, Account, AccountDomain, FileName, CommandLine, ParentProcessName \n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Process executed from binary hidden in Base64 encoded file",
+    "enabled": true,
+    "description": "Encoding malicious software is a technique used to obfuscate files from detection. \nThe first CommandLine component is looking for Python decoding base64. \nThe second CommandLine component is looking for Bash/sh command line base64 decoding.\nThe third one is looking for Ruby decoding base64.",
+    "tactics": [
+      "Execution",
+      "DefenseEvasion"
+    ],
+    "alertRuleTemplateName": "d6190dde-8fd2-456a-ac5b-0a32400b0464",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet spanoftime = 10m;\nlet threshold = 0;\nSecurityEvent \n| where TimeGenerated > ago(2*timeframe) \n// A user account was created\n| where EventID == 4720\n| where AccountType =~ \"User\"\n| project creationTime = TimeGenerated, CreateEventID = EventID, Activity, Computer, TargetUserName, UserPrincipalName, \nAccountUsedToCreate = SubjectUserName, TargetSid, SubjectUserSid \n| join kind= inner (\n  SecurityEvent\n  | where TimeGenerated > ago(timeframe) \n  // A user account was deleted \n  | where EventID == 4726\n| where AccountType == \"User\"\n| project deletionTime = TimeGenerated, DeleteEventID = EventID, Activity, Computer, TargetUserName, UserPrincipalName, \nAccountUsedToDelete = SubjectUserName, TargetSid, SubjectUserSid \n) on Computer, TargetUserName\n| where deletionTime - creationTime < spanoftime\n| extend TimeDelta = deletionTime - creationTime\n| where tolong(TimeDelta) >= threshold\n| project TimeDelta, creationTime, CreateEventID, Computer, TargetUserName, UserPrincipalName, AccountUsedToCreate, \ndeletionTime, DeleteEventID, AccountUsedToDelete\n| extend timestamp = creationTime, AccountCustomEntity = AccountUsedToCreate, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "User account created and deleted within 10 mins",
+    "enabled": true,
+    "description": "Identifies when a user account is created and then deleted within 10 minutes. This can be an indication of compromise and\nan adversary attempting to hide in the noise.",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "4b93c5af-d20b-4236-b696-a28b8c51407f",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let endtime = 1d;\nlet starttime = 8d;\n// The threshold below excludes matching on RDP connection computer counts of 5 or more by a given account and IP in a given day.  Change the threshold as needed.\nlet threshold = 5;\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n// Labeling the first RDP connection time, computer and ip\n| extend FirstHop = TimeGenerated, FirstComputer = toupper(Computer), FirstIPAddress = IpAddress, Account = tolower(Account)  \n| join kind=inner (\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n// Labeling the second RDP connection time, computer and ip\n| extend SecondHop = TimeGenerated, SecondComputer = toupper(Computer), SecondIPAddress = IpAddress, Account = tolower(Account)\n) on Account\n// Make sure that the first connection is after the second connection --> SecondHop > FirstHop\n// Then identify only RDP to another computer from within the first RDP connection by only choosing matches where the Computer names do not match --> FirstComputer != SecondComputer\n// Then make sure the IPAddresses do not match by excluding connections from the same computers with first hop RDP connections to multiple computers --> FirstIPAddress != SecondIPAddress\n| where FirstComputer != SecondComputer and FirstIPAddress != SecondIPAddress and SecondHop > FirstHop\n// where the second hop occurs within 30 minutes of the first hop\n| where SecondHop <= FirstHop+30m\n| distinct Account, FirstHop, FirstComputer, FirstIPAddress, SecondHop, SecondComputer, SecondIPAddress, AccountType, Activity, LogonTypeName, ProcessName\n// use left anti to exclude anything from the previous 7 days where the Account and IP has connected 5 or more computers.\n| join kind=leftanti (\nSecurityEvent\n| where TimeGenerated >= ago(starttime) and TimeGenerated < ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize makeset(Computer), ComputerCount = dcount(Computer) by bin(TimeGenerated, 1d), Account = tolower(Account), IpAddress\n// Connection count to computer by same account and IP to exclude counts of 5 or more on a given day\n| where ComputerCount >= threshold\n| mvexpand set_Computer\n| extend Computer = toupper(set_Computer)\n) on Account, $left.SecondComputer == $right.Computer, $left.SecondIPAddress == $right.IpAddress\n| summarize FirstHopFirstSeen = min(FirstHop), FirstHopLastSeen = max(FirstHop) by Account, FirstComputer, FirstIPAddress, SecondHop, SecondComputer, \nSecondIPAddress, AccountType, Activity, LogonTypeName, ProcessName\n| extend timestamp = FirstHopFirstSeen, AccountCustomEntity = Account, HostCustomEntity = FirstComputer, IPCustomEntity = FirstIPAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P8D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "RDP Nesting",
+    "enabled": true,
+    "description": "Identifies when an RDP connection is made to a first system and then an RDP connection is made from the first system \nto another system with the same account within the 60 minutes. Additionally, if historically daily  \nRDP connections are indicated by the logged EventID 4624 with LogonType = 10",
+    "tactics": [
+      "LateralMovement"
+    ],
+    "alertRuleTemplateName": "69a45b05-71f5-45ca-8944-2e038747fb39",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\n//Adjust this threshold to fit environment\nlet signin_threshold = 5; \n//Make a list of IPs with failed Windows host logins above threshold\nlet win_fails = \nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID == 4625\n| where LogonType in (10, 7, 3)\n| where IpAddress != \"-\"\n| summarize count() by IpAddress\n| where count_ > signin_threshold\n| summarize make_list(IpAddress);\n//Make a list of IPs with failed *nix host logins above threshold\nlet nix_fails = \nSyslog\n| where TimeGenerated > ago(timeframe)\n| where Facility contains 'auth' and ProcessName != 'sudo'\n| extend SourceIP = extract(\"(([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.(([0-9]{1,3})))\",1,SyslogMessage)\n| where SourceIP != \"\" and SourceIP != \"127.0.0.1\"\n| summarize count() by SourceIP\n| where count_ > signin_threshold\n| summarize make_list(SourceIP);\n//See if any of the IPs with failed host logins hve had a sucessful Azure AD login\nSigninLogs\n| where TimeGenerated > ago(timeframe)\n| where ResultType !in (\"0\", \"50125\", \"50140\")\n| where IPAddress in (win_fails) or IPAddress in (nix_fails)\n| extend Reason=  \"Multiple failed host logins from IP address with successful Azure AD login\"\n| extend timstamp = TimeGenerated, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Failed host logons but success logon to AzureAD",
+    "enabled": true,
+    "description": "Identifies a list of IP addresses with a minimum number(default of 5) of failed logon attempts to remote hosts.\nUses that list to identify any successful logons to Azure Active Directory from these IPs within the same timeframe.",
+    "tactics": [
+      "InitialAccess",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "1ce5e766-26ab-4616-b7c8-3b33ae321e80",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\n//Adjust this threshold to fit environment\nlet signin_threshold = 5; \n//Make a list of IPs with failed Windows host logins above threshold\nlet win_fails = \nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID == 4625\n| where LogonType in (10, 7, 3)\n| where IpAddress != \"-\"\n| summarize count() by IpAddress\n| where count_ > signin_threshold\n| summarize make_list(IpAddress);\n//Make a list of IPs with failed *nix host logins above threshold\nlet nix_fails = \nSyslog\n| where TimeGenerated > ago(timeframe)\n| where Facility contains 'auth' and ProcessName != 'sudo'\n| extend SourceIP = extract(\"(([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.(([0-9]{1,3})))\",1,SyslogMessage)\n| where SourceIP != \"\" and SourceIP != \"127.0.0.1\"\n| summarize count() by SourceIP\n| where count_ > signin_threshold\n| summarize make_list(SourceIP);\n//See if any of the IPs with failed host logins hve had a sucessful Azure AD login\nSigninLogs\n| where TimeGenerated > ago(timeframe)\n| where ResultType !in (\"0\", \"50125\", \"50140\")\n| where IPAddress in (win_fails) or IPAddress in (nix_fails)\n| extend Reason=  \"Multiple failed host logins from IP address with successful Azure AD login\"\n| extend timstamp = TimeGenerated, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Failed host logons but success logon to AzureAD",
+    "enabled": true,
+    "description": "Identifies a list of IP addresses with a minimum number(default of 5) of failed logon attempts to remote hosts.\nUses that list to identify any successful logons to Azure Active Directory from these IPs within the same timeframe.",
+    "tactics": [
+      "InitialAccess",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "1ce5e766-26ab-4616-b7c8-3b33ae321e80",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let endtime = 1d;\nlet starttime = 8d;\n// The threshold below excludes matching on RDP connection computer counts of 5 or more by a given account and IP in a given day.  Change the threshold as needed.\nlet threshold = 5;\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n// Labeling the first RDP connection time, computer and ip\n| extend FirstHop = TimeGenerated, FirstComputer = toupper(Computer), FirstIPAddress = IpAddress, Account = tolower(Account)  \n| join kind=inner (\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n// Labeling the second RDP connection time, computer and ip\n| extend SecondHop = TimeGenerated, SecondComputer = toupper(Computer), SecondIPAddress = IpAddress, Account = tolower(Account)\n) on Account\n// Make sure that the first connection is after the second connection --> SecondHop > FirstHop\n// Then identify only RDP to another computer from within the first RDP connection by only choosing matches where the Computer names do not match --> FirstComputer != SecondComputer\n// Then make sure the IPAddresses do not match by excluding connections from the same computers with first hop RDP connections to multiple computers --> FirstIPAddress != SecondIPAddress\n| where FirstComputer != SecondComputer and FirstIPAddress != SecondIPAddress and SecondHop > FirstHop\n// where the second hop occurs within 30 minutes of the first hop\n| where SecondHop <= FirstHop+30m\n| distinct Account, FirstHop, FirstComputer, FirstIPAddress, SecondHop, SecondComputer, SecondIPAddress, AccountType, Activity, LogonTypeName, ProcessName\n// use left anti to exclude anything from the previous 7 days where the Account and IP has connected 5 or more computers.\n| join kind=leftanti (\nSecurityEvent\n| where TimeGenerated >= ago(starttime) and TimeGenerated < ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize makeset(Computer), ComputerCount = dcount(Computer) by bin(TimeGenerated, 1d), Account = tolower(Account), IpAddress\n// Connection count to computer by same account and IP to exclude counts of 5 or more on a given day\n| where ComputerCount >= threshold\n| mvexpand set_Computer\n| extend Computer = toupper(set_Computer)\n) on Account, $left.SecondComputer == $right.Computer, $left.SecondIPAddress == $right.IpAddress\n| summarize FirstHopFirstSeen = min(FirstHop), FirstHopLastSeen = max(FirstHop) by Account, FirstComputer, FirstIPAddress, SecondHop, SecondComputer, \nSecondIPAddress, AccountType, Activity, LogonTypeName, ProcessName\n| extend timestamp = FirstHopFirstSeen, AccountCustomEntity = Account, HostCustomEntity = FirstComputer, IPCustomEntity = FirstIPAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P8D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "RDP Nesting",
+    "enabled": true,
+    "description": "Identifies when an RDP connection is made to a first system and then an RDP connection is made from the first system \nto another system with the same account within the 60 minutes. Additionally, if historically daily  \nRDP connections are indicated by the logged EventID 4624 with LogonType = 10",
+    "tactics": [
+      "LateralMovement"
+    ],
+    "alertRuleTemplateName": "69a45b05-71f5-45ca-8944-2e038747fb39",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID == 1102 and EventSourceName == \"Microsoft-Windows-Eventlog\" \n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), EventCount = count() by Computer, Account, EventID, Activity\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Security Event log cleared",
+    "enabled": true,
+    "description": "Checks for event id 1102 which indicates the security event log was cleared. \nIt uses Event Source Name \"Microsoft-Windows-Eventlog\" to avoid generating false positives from other sources, like AD FS servers for instance.",
+    "tactics": [
+      "DefenseEvasion"
+    ],
+    "alertRuleTemplateName": "80da0a8f-cfe1-4cd0-a895-8bc1771a720e",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet ProcessCreationEvents=() {\nlet processEvents=SecurityEvent\n| where EventID==4688\n| where isnotempty(CommandLine)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), count() by Computer, Account = SubjectUserName, AccountDomain = SubjectDomainName,\nFileName = Process, CommandLine, ParentProcessName;\nprocessEvents};\nProcessCreationEvents\n| where CommandLine contains \"TVqQAAMAAAAEAAA\"\n| where StartTimeUtc >= ago(timeframe)\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Base64 encoded Windows process command-lines",
+    "enabled": true,
+    "description": "Identifies instances of a base64 encoded PE file header seen in the process command line parameter.",
+    "tactics": [
+      "Execution",
+      "DefenseEvasion"
+    ],
+    "alertRuleTemplateName": "ca67c83e-7fff-4127-a3e3-1af66d6d4cad",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Low",
+    "query": "let starttime = 2d;\nlet endtime = 1d;\nSecurityEvent\n// include yesterday and not today, so we can confirm a match occurs within the next day\n| where TimeGenerated >= startofday(ago(starttime)) and TimeGenerated <= startofday(ago(endtime))  \n// 4722: User Account Enabled\n| where EventID == 4722 \n// Removing Machine Accounts\n| where TargetUserName !endswith \"$\" \n| join kind= leftanti (\n  SecurityEvent\n  //verify over the last 2 days\n  | where TimeGenerated >= startofday(ago(starttime))\n  // Attempt made to change password\n  | where EventID == 4723\n  // Removing Machine Accounts\n  | where TargetUserName !endswith \"$\"\n) on TargetUserName, TargetDomainName\n| project StartTimeUtc = TimeGenerated, EventID, Computer, TargetUserName, TargetDomainName, SubjectUserName\n| extend timestamp = StartTimeUtc, AccountCustomEntity = TargetUserName, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P2D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "AD user created password not set within 24-48 hours",
+    "enabled": true,
+    "description": "Identifies whenever a new account is created with a default password and password is not changed within 24-48 hours.\nSimple version, can be more precise with Windowing, but not necessary if run as an alert on a daily basis.\nEffectively, there is an event 4722 indicating a user enabled and no event 4723 indicating a password was changed within in that day or the next day.",
+    "tactics": [
+      "Persistence"
+    ],
+    "alertRuleTemplateName": "62085097-d113-459f-9ea7-30216f2ee6af",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nSecurityEvent\n| where TimeGenerated > ago(timeframe) \n| where EventID == 4720\n| where AccountType == \"User\"\n| project CreatedUserTime = TimeGenerated, CreatedUserEventID = EventID, CreatedUserActivity = Activity, Computer = toupper(Computer), \nCreatedUser = tolower(TargetUserName), Domain = toupper(TargetDomainName), CreatedUserSid = TargetSid, AccountUsedToCreateUser = SubjectUserName\n|join (\nSecurityEvent \n| where TimeGenerated > ago(timeframe) \n| where AccountType == \"User\"\n// 4732 - A member was added to a security-enabled local group\n| where EventID == 4732\n//TargetSid is the builin Admins group: S-1-5-32-544\n| where TargetSid == \"S-1-5-32-544\"\n| project GroupAddTime = TimeGenerated, GroupAddEventID = EventID, GroupAddActivity = Activity, Computer = toupper(Computer), GroupName = TargetUserName, \nDomain = toupper(TargetDomainName), GroupSid = TargetSid, UserAdded = SubjectUserName, UserAddedSid = SubjectUserSid, CreatedUser = tolower(SubjectUserName), \nCreatedUserSid = MemberSid\n)\non CreatedUserSid\n//Create User first, then the add to the group.\n| project Computer, CreatedUserTime, CreatedUserEventID, CreatedUserActivity, CreatedUser, CreatedUserSid, Domain, GroupAddTime, GroupAddEventID, \nGroupAddActivity, AccountUsedToCreateUser, GroupName, GroupSid, UserAdded, UserAddedSid \n| extend timestamp = CreatedUserTime, AccountCustomEntity = CreatedUser, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "New user created and added to the built-in administrators group",
+    "enabled": true,
+    "description": "Identifies when a user account was created and then added to the builtin Administrators group in the same day.\nThis should be monitored closely and all additions reviewed.",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "aa1eff90-29d4-49dc-a3ea-b65199f516db",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nSecurityEvent\n| where TimeGenerated >= ago(timeframe) \n| where EventID == 4738\n// 2089 value indicates the Don't Expire Password value has been set\n| where UserAccountControl has \"%%2089\" \n| extend Value_2089 = iff(UserAccountControl has \"%%2089\",\"'Don't Expire Password' - Disabled\", \"Not Changed\")\n// 2050 indicates that the Password Not Required value is NOT set, this often shows up at the same time as a 2089 and is the recommended value.  This value may not be in the event. \n| extend Value_2050 = iff(UserAccountControl has \"%%2050\",\"'Password Not Required' - Disabled\", \"Not Changed\")\n// If value %%2082 is present in the 4738 event, this indicates the account has been configured to logon WITHOUT a password. Generally you should only see this value when an account is created and only in Event 4720: Account Creation Event.  \n| extend Value_2082 = iff(UserAccountControl has \"%%2082\",\"'Password Not Required' - Enabled\", \"Not Changed\")\n| project StartTimeUtc = TimeGenerated, EventID, Computer, TargetUserName, TargetDomainName, AccountType, UserAccountControl, Value_2089, Value_2050, Value_2082\n| extend timestamp = StartTimeUtc, AccountCustomEntity = TargetUserName, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "AD account with don't expire password - disabled",
+    "enabled": true,
+    "description": "Identifies whenever a user account has the setting \"Password Never Expires\" in the user account properties selected.\nThis is indicated in Security event 4738 in the EventData item labeled UserAccountControl with an included value of %%2089 \n%%2089 resolves to \"Don't Expire Password - Disabled\".",
+    "tactics": [
+      "Persistence"
+    ],
+    "alertRuleTemplateName": "6c360107-f3ee-4b91-9f43-f4cfd90441cf",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let endtime = 1d;\nlet starttime = 8d;\nlet threshold = 2.0;\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), ComputerCountToday = dcount(Computer), ComputerSet = makeset(Computer), ProcessSet = makeset(ProcessName)  \nby Account, IpAddress, AccountType, Activity, LogonTypeName\n| join kind=inner (\nSecurityEvent\n| where TimeGenerated >= ago(starttime) and TimeGenerated < ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize ComputerCountPrev7Days = dcount(Computer) by Account, IpAddress\n) on Account, IpAddress\n| extend Ratio = ComputerCountToday/(ComputerCountPrev7Days*1.0)\n// Where the ratio of today to previous 7 days is more than double.\n| where Ratio > threshold\n| project StartTimeUtc, EndTimeUtc, Account, IpAddress, ComputerSet, ComputerCountToday, ComputerCountPrev7Days, Ratio, AccountType, Activity, LogonTypeName, ProcessSet\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, IPCustomEntity = IpAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P8D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Multiple RDP connections from Single System",
+    "enabled": true,
+    "description": "Identifies when an RDP connection is made to multiple systems and above the normal for the previous 7 days.  \nConnections from the same system with the same account within the same day.\nRDP connections are indicated by the EventID 4624 with LogonType = 10",
+    "tactics": [
+      "LateralMovement"
+    ],
+    "alertRuleTemplateName": "78422ef2-62bf-48ca-9bab-72c69818a425",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nlet WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-498$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1000$\";\nlet AC_Add = \nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n// Event ID related to member addition.\n| where EventID in (4728, 4732,4756) \n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID  \n| parse EventData with * '\"MemberName\">' AccountAdded \",OU\" * \n| where isnotempty(AccountAdded)\n| extend GroupAddedTo = TargetUserName, AddingAccount = Account \n| extend  AccountAdded_GroupAddedTo_AddingAccount = strcat(AccountAdded, \"||\", GroupAddedTo, \"||\", AddingAccount )\n| project AccountAdded_GroupAddedTo_AddingAccount, AccountAddedTime = TimeGenerated;\nlet AC_Remove = \nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n// Event IDs related to member removal.\n| where EventID in (4729,4733,4757)\n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID \n| parse EventData with * '\"MemberName\">' AccountRemoved \",OU\" * \n| where isnotempty(AccountRemoved)\n| extend GroupRemovedFrom = TargetUserName, RemovingAccount = Account\n| extend AccountRemoved_GroupRemovedFrom_RemovingAccount = strcat(AccountRemoved, \"||\", GroupRemovedFrom, \"||\", RemovingAccount)\n| project AccountRemoved_GroupRemovedFrom_RemovingAccount, AccountRemovedTime = TimeGenerated, Computer, RemovedAccountId = tolower(AccountRemoved), \nRemovedByUser = SubjectUserName, RemovedByUserLogonId = SubjectLogonId,  GroupRemovedFrom = TargetUserName, TargetDomainName; \nAC_Add \n| join kind= inner AC_Remove on $left.AccountAdded_GroupAddedTo_AddingAccount == $right.AccountRemoved_GroupRemovedFrom_RemovingAccount \n| extend DurationinSecondAfter_Removed = datetime_diff ('second', AccountRemovedTime, AccountAddedTime)\n| where DurationinSecondAfter_Removed > 0\n| project-away AccountRemoved_GroupRemovedFrom_RemovingAccount\n| extend timestamp = AccountAddedTime, AccountCustomEntity = RemovedAccountId, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Account added and removed from privileged groups",
+    "enabled": true,
+    "description": "Identifies accounts that are added to privileged group and then quickly removed, which could be a sign of compromise.' ",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "7efc75ce-e2a4-400f-a8b1-283d3b0f2c60",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let endtime = 1d;\nlet starttime = 8d;\nlet threshold = 2.0;\nSecurityEvent\n| where TimeGenerated >= ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), ComputerCountToday = dcount(Computer), ComputerSet = makeset(Computer), ProcessSet = makeset(ProcessName)  \nby Account, IpAddress, AccountType, Activity, LogonTypeName\n| join kind=inner (\nSecurityEvent\n| where TimeGenerated >= ago(starttime) and TimeGenerated < ago(endtime) \n| where EventID == 4624 and LogonType == 10\n| summarize ComputerCountPrev7Days = dcount(Computer) by Account, IpAddress\n) on Account, IpAddress\n| extend Ratio = ComputerCountToday/(ComputerCountPrev7Days*1.0)\n// Where the ratio of today to previous 7 days is more than double.\n| where Ratio > threshold\n| project StartTimeUtc, EndTimeUtc, Account, IpAddress, ComputerSet, ComputerCountToday, ComputerCountPrev7Days, Ratio, AccountType, Activity, LogonTypeName, ProcessSet\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, IPCustomEntity = IpAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P8D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Multiple RDP connections from Single System",
+    "enabled": true,
+    "description": "Identifies when an RDP connection is made to multiple systems and above the normal for the previous 7 days.  \nConnections from the same system with the same account within the same day.\nRDP connections are indicated by the EventID 4624 with LogonType = 10",
+    "tactics": [
+      "LateralMovement"
+    ],
+    "alertRuleTemplateName": "78422ef2-62bf-48ca-9bab-72c69818a425",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nlet WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-498$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1000$\";\nlet AC_Add = \nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n// Event ID related to member addition.\n| where EventID in (4728, 4732,4756) \n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID  \n| parse EventData with * '\"MemberName\">' AccountAdded \",OU\" * \n| where isnotempty(AccountAdded)\n| extend GroupAddedTo = TargetUserName, AddingAccount = Account \n| extend  AccountAdded_GroupAddedTo_AddingAccount = strcat(AccountAdded, \"||\", GroupAddedTo, \"||\", AddingAccount )\n| project AccountAdded_GroupAddedTo_AddingAccount, AccountAddedTime = TimeGenerated;\nlet AC_Remove = \nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n// Event IDs related to member removal.\n| where EventID in (4729,4733,4757)\n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID \n| parse EventData with * '\"MemberName\">' AccountRemoved \",OU\" * \n| where isnotempty(AccountRemoved)\n| extend GroupRemovedFrom = TargetUserName, RemovingAccount = Account\n| extend AccountRemoved_GroupRemovedFrom_RemovingAccount = strcat(AccountRemoved, \"||\", GroupRemovedFrom, \"||\", RemovingAccount)\n| project AccountRemoved_GroupRemovedFrom_RemovingAccount, AccountRemovedTime = TimeGenerated, Computer, RemovedAccountId = tolower(AccountRemoved), \nRemovedByUser = SubjectUserName, RemovedByUserLogonId = SubjectLogonId,  GroupRemovedFrom = TargetUserName, TargetDomainName; \nAC_Add \n| join kind= inner AC_Remove on $left.AccountAdded_GroupAddedTo_AddingAccount == $right.AccountRemoved_GroupRemovedFrom_RemovingAccount \n| extend DurationinSecondAfter_Removed = datetime_diff ('second', AccountRemovedTime, AccountAddedTime)\n| where DurationinSecondAfter_Removed > 0\n| project-away AccountRemoved_GroupRemovedFrom_RemovingAccount\n| extend timestamp = AccountAddedTime, AccountCustomEntity = RemovedAccountId, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Account added and removed from privileged groups",
+    "enabled": true,
+    "description": "Identifies accounts that are added to privileged group and then quickly removed, which could be a sign of compromise.' ",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "7efc75ce-e2a4-400f-a8b1-283d3b0f2c60",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\n// For AD SID mappings - https://docs.microsoft.com/windows/security/identity-protection/access-control/active-directory-security-groups\nlet WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-498$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1000$\";\nSecurityEvent \n| where TimeGenerated > ago(timeframe)\n// When MemberName contains '-' this indicates addition of a group to a group\n| where AccountType == \"User\" and MemberName != \"-\"\n// 4728 - A member was added to a security-enabled global group\n// 4732 - A member was added to a security-enabled local group\n// 4756 - A member was added to a security-enabled universal group\n| where EventID in (4728, 4732, 4756)   \n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID\n// Exclude Remote Desktop Users group: S-1-5-32-555\n| where TargetSid !in (\"S-1-5-32-555\")\n| extend SimpleMemberName = tostring(split(tostring(split(MemberName, \",\")[0]),\"CN=\")[1])\n| project StartTimeUtc = TimeGenerated, EventID, Activity, Computer, SimpleMemberName, MemberName, MemberSid, TargetUserName, TargetDomainName, TargetSid, UserPrincipalName, SubjectUserName, SubjectUserSid\n| extend timestamp = StartTimeUtc, AccountCustomEntity = SimpleMemberName, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "User account added to built in domain local or global group",
+    "enabled": true,
+    "description": "Identifies when a user account has been added to a privileged built in domain local group or global group \nsuch as the Enterprise Admins, Cert Publishers or DnsAdmins. Be sure to verify this is an expected addition.",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "a35f2c18-1b97-458f-ad26-e033af18eb99",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let starttime = 8d;\nlet endtime = 1d;\nlet threshold = 0.333;\nlet countlimit = 50;\nSecurityEvent\n| where TimeGenerated >= ago(endtime)\n| where EventID == 4625 and AccountType =~ \"User\"\n| where IpAddress !in (\"127.0.0.1\", \"::1\")\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), CountToday = count() by EventID, Account, LogonTypeName, SubStatus, AccountType, Computer, WorkstationName, IpAddress\n| join kind=leftouter (\n    SecurityEvent \n    | where TimeGenerated between (ago(starttime) .. ago(endtime))\n    | where EventID == 4625 and AccountType =~ \"User\"\n    | where IpAddress !in (\"127.0.0.1\", \"::1\")\n    | summarize CountPrev7day = count() by EventID, Account, LogonTypeName, SubStatus, AccountType, Computer, WorkstationName, IpAddress\n) on EventID, Account, LogonTypeName, SubStatus, AccountType, Computer, WorkstationName, IpAddress\n| where CountToday >= coalesce(CountPrev7day,0)*threshold and CountToday >= countlimit\n//SubStatus Codes are detailed here - https://docs.microsoft.com/windows/security/threat-protection/auditing/event-4625\n| extend Reason = case(\nSubStatus =~ '0xC000005E', 'There are currently no logon servers available to service the logon request.',\nSubStatus =~ '0xC0000064', 'User logon with misspelled or bad user account',\nSubStatus =~ '0xC000006A', 'User logon with misspelled or bad password',    \nSubStatus =~ '0xC000006D', 'Bad user name or password',\nSubStatus =~ '0xC000006E', 'Unknown user name or bad password',\nSubStatus =~ '0xC000006F', 'User logon outside authorized hours',\nSubStatus =~ '0xC0000070', 'User logon from unauthorized workstation',\nSubStatus =~ '0xC0000071', 'User logon with expired password',\nSubStatus =~ '0xC0000072', 'User logon to account disabled by administrator',\nSubStatus =~ '0xC00000DC', 'Indicates the Sam Server was in the wrong state to perform the desired operation',  \nSubStatus =~ '0xC0000133', 'Clocks between DC and other computer too far out of sync',\nSubStatus =~ '0xC000015B', 'The user has not been granted the requested logon type (aka logon right) at this machine',\nSubStatus =~ '0xC000018C', 'The logon request failed because the trust relationship between the primary domain and the trusted domain failed',\nSubStatus =~ '0xC0000192', 'An attempt was made to logon, but the Netlogon service was not started',\nSubStatus =~ '0xC0000193', 'User logon with expired account',\nSubStatus =~ '0xC0000224', 'User is required to change password at next logon',\nSubStatus =~ '0xC0000225', 'Evidently a bug in Windows and not a risk',\nSubStatus =~ '0xC0000234', 'User logon with account locked',\nSubStatus =~ '0xC00002EE', 'Failure Reason: An Error occurred during Logon',\nSubStatus =~ '0xC0000413', 'Logon Failure: The machine you are logging onto is protected by an authentication firewall. The specified account is not allowed to authenticate to the machine',\nstrcat('Unknown reason substatus: ', SubStatus))\n| extend WorkstationName = iff(WorkstationName == \"-\" or isempty(WorkstationName), Computer , WorkstationName) \n| project StartTime, EndTime, EventID, Account, LogonTypeName, SubStatus, Reason, AccountType, Computer, WorkstationName, IpAddress, CountToday, CountPrev7day, Avg7Day = round(CountPrev7day*1.00/7,2)\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), Computer = make_set(Computer,128), IpAddressList = make_set(IpAddress,128), sum(CountToday), sum(CountPrev7day), avg(Avg7Day) \nby EventID, Account, LogonTypeName, SubStatus, Reason, AccountType, WorkstationName\n| order by sum_CountToday desc nulls last \n| extend timestamp = StartTime, AccountCustomEntity = Account, HostCustomEntity = WorkstationName",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P8D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Excessive Windows logon failures",
+    "enabled": true,
+    "description": "User has over 50 Windows logon failures today and at least 33% of the count of logon failures over the previous 7 days.",
+    "tactics": [
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "2391ce61-8c8d-41ac-9723-d945b2e90720",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+   }
+
+  ]
+    
+  }

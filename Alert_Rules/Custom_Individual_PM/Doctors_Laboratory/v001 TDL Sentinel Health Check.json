@@ -1,0 +1,34 @@
+{
+    "Scheduled": [
+
+{
+    "severity": "Medium",
+    "query": "(union isfuzzy=true\r\n    (Syslog\r\n    | where TimeGenerated > ago(1d)\r\n    | summarize last_log = datetime_diff(\"minute\", now(), max(TimeGenerated)) by Computer\r\n    | where last_log > 240\r\n    | project Syslog_host = Computer, ['Last Record (minutes ago)'] = last_log\r\n    | order by ['Last Record (minutes ago)'] desc\r\n    ),\r\n    (\r\n    CommonSecurityLog\r\n    | where TimeGenerated > ago(1d)\r\n    | summarize last_log = datetime_diff(\"minute\", now(), max(TimeGenerated)) by DeviceName\r\n    | where last_log > 240\r\n    | project CommonSecLog_host = DeviceName, ['Last Record (minutes ago)'] = last_log\r\n    | order by ['Last Record (minutes ago)'] desc\r\n    ),\r\n    (\r\n    CommonSecurityLog\r\n    | where TimeGenerated > ago(1d)\r\n    | summarize last_log = datetime_diff(\"minute\", now(), max(TimeGenerated)) by DeviceProduct\r\n    | where last_log > 240\r\n    | project CommonSecLog_DeviceProduct = DeviceProduct, ['Last Record (minutes ago)'] = last_log\r\n    | order by ['Last Record (minutes ago)'] desc\r\n    ),\r\n    (\r\n    SecurityEvent\r\n    | where TimeGenerated > ago(1d)\r\n    | summarize last_log = datetime_diff(\"minute\", now(), max(TimeGenerated)) by Computer\r\n    | where last_log > 240\r\n    | project SecurityEvent_host = Computer, ['Last Record (minutes ago)'] = last_log\r\n    | order by ['Last Record (minutes ago)'] desc\r\n    ))",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "v001 TDL Sentinel Health Check",
+    "enabled": true,
+    "description": "Alerts when a log source has stopped feeding data into Sentinel for more than 4 hours. The rule looks for the following log sources:\n\nSyslog: Computer | CommonSecurityLog: DeviceName | CommonSecurityLog: DeviceProduct | SecurityEvent: Computer",
+    "tactics": [],
+    "alertRuleTemplateName": null,
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  }
+
+]
+    
+  }

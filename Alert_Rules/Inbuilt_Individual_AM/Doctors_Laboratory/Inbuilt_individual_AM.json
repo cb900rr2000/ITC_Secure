@@ -1,0 +1,632 @@
+{
+    "Scheduled": [
+
+{
+    "severity": "High",
+    "query": "let timeframe = 1d;\nlet IPList = dynamic([\"154.223.45.38\",\"185.141.207.140\",\"185.234.73.19\",\"216.245.210.106\",\"51.91.48.210\",\"46.255.230.229\"]);\n(union isfuzzy=true\n(CommonSecurityLog\n| where TimeGenerated >= ago(timeframe) \n| where isnotempty(SourceIP) or isnotempty(DestinationIP)\n| where SourceIP in (IPList) or DestinationIP in (IPList) or Message has_any (IPList)\n| extend IPMatch = case(SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", \"Message\") \n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by SourceIP, DestinationIP, DeviceProduct, DeviceAction, Message, Protocol, SourcePort, DestinationPort, DeviceAddress, DeviceName, IPMatch\n| extend timestamp = StartTimeUtc, IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, \"IP in Message Field\") \n),\n(OfficeActivity\n| where TimeGenerated >= ago(timeframe) \n|extend SourceIPAddress = ClientIP, Account = UserId\n| where  SourceIPAddress in (IPList)\n| extend timestamp = TimeGenerated , IPCustomEntity = SourceIPAddress , AccountCustomEntity = Account\n),\n(DnsEvents \n| where TimeGenerated >= ago(timeframe) \n| extend DestinationIPAddress = IPAddresses,  Host = Computer\n| where  DestinationIPAddress has_any (IPList) \n| extend timestamp = TimeGenerated, IPCustomEntity = DestinationIPAddress, HostCustomEntity = Host\n),\n(VMConnection \n| where TimeGenerated >= ago(timeframe) \n| where isnotempty(SourceIp) or isnotempty(DestinationIp) \n| where SourceIp in (IPList) or DestinationIp in (IPList) \n| extend IPMatch = case( SourceIp in (IPList), \"SourceIP\", DestinationIp in (IPList), \"DestinationIP\", \"None\") \n| extend timestamp = TimeGenerated , IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIp, IPMatch == \"DestinationIP\", DestinationIp, \"None\"), Host = Computer\n),\n(Event\n| where TimeGenerated >= ago(timeframe)\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID == 3\n| extend EvData = parse_xml(EventData)\n| extend EventDetail = EvData.DataItem.EventData.Data\n| extend SourceIP = EventDetail.[9].[\"#text\"], DestinationIP = EventDetail.[14].[\"#text\"]\n| where SourceIP in (IPList) or DestinationIP in (IPList) \n| extend IPMatch = case( SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", \"None\") \n| extend timestamp = TimeGenerated, AccountCustomEntity = UserName, HostCustomEntity = Computer , IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, \"None\")\n), \n(WireData \n| where TimeGenerated >= ago(timeframe)\n| where isnotempty(RemoteIP)\n| where RemoteIP in (IPList)\n| extend timestamp = TimeGenerated, IPCustomEntity = RemoteIP, HostCustomEntity = Computer\n),\n(SigninLogs\n| where TimeGenerated >= ago(timeframe)\n| where isnotempty(IPAddress)\n| where IPAddress in (IPList)\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n),\n(W3CIISLog \n| where TimeGenerated >= ago(timeframe)\n| where isnotempty(cIP)\n| where cIP in (IPList)\n| extend timestamp = TimeGenerated, IPCustomEntity = cIP, HostCustomEntity = Computer, AccountCustomEntity = csUserName\n),\n(AzureActivity \n| where TimeGenerated >= ago(timeframe)\n| where isnotempty(CallerIpAddress)\n| where CallerIpAddress in (IPList)\n| extend timestamp = TimeGenerated, IPCustomEntity = CallerIpAddress, AccountCustomEntity = Caller\n),\n(\nAWSCloudTrail\n| where TimeGenerated >= ago(timeframe)\n| where isnotempty(SourceIpAddress)\n| where SourceIpAddress in (IPList)\n| extend timestamp = TimeGenerated, IPCustomEntity = SourceIpAddress, AccountCustomEntity = UserIdentityUserName\n)\n)",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Known IRIDIUM IP",
+    "enabled": true,
+    "description": "IRIDIUM command and control IP. Identifies a match across various data feeds for IP IOCs related to the IRIDIUM activity group.",
+    "tactics": [
+      "CommandAndControl"
+    ],
+    "alertRuleTemplateName": "7ee72a9e-2e54-459c-bc8a-8c08a6532a63",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
+  },
+  {
+    "severity": "High",
+    "query": "let timeframe = 1d;\nlet IPList = dynamic([\"45.63.52.41\",\"140.82.17.161\",\"207.148.101.95\",\"45.32.87.51\",\"66.42.98.156\",\"45.76.144.105\",\"217.163.28.35\",\"45.32.141.174\",\"149.28.165.249\",\"209.250.225.247\",\"45.63.100.115\",\"95.179.229.230\",\"209.250.233.247\",\"45.77.121.232\",\"45.76.175.65\",\"104.238.160.237\",\"45.77.181.97\",\"95.179.192.125\",\"149.28.93.184\",\"140.82.16.81\",\"45.76.173.103\",\"45.77.255.22\",\"45.32.11.71\",\"149.28.77.26\",\"45.32.54.50\",\"104.156.233.156\",\"45.32.21.118\",\"45.63.62.109\",\"45.77.244.202\",\"149.248.11.205\",\"104.238.190.244\"]);\nlet IOCTerms = \"\\\\?lang=[/..]*/dev/cmdb/sslvpn_websession|/dana-na/jam/[/..]*home/webserver/htdocs/dana/html5acc/guacamole[/..]*etc/passwd\\\\?\";\n(union isfuzzy=true\n(CommonSecurityLog\n| where TimeGenerated >= ago(1d) \n| where isnotempty(SourceIP) or isnotempty(DestinationIP)\n| where SourceIP in (IPList) or DestinationIP in (IPList) or Message has_any (IPList)\n| extend IPMatch = case(\nSourceIP in (IPList), \"SourceIP\", \nDestinationIP in (IPList), \"DestinationIP\",\n\"Message\") \n| where Message matches regex IOCTerms\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by SourceIP, DestinationIP, DeviceProduct, DeviceAction, Message, Protocol, SourcePort, DestinationPort, DeviceAddress, DeviceName, IPMatch\n| extend timestamp = StartTimeUtc, IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, \"IP in Message Field\") \n),\n(OfficeActivity\n| where TimeGenerated >= ago(1d) \n| where isnotempty(UserAgent) and ClientIP in (IPList)\n| where UserAgent contains \"ExchangeServicesClient/0.0.0.0\"\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by SourceIP = ClientIP, Account = UserId, Type, RecordType, OfficeWorkload, UserAgent, OfficeObjectId, IPMatch = \"ClientIP\"\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, IPCustomEntity = SourceIP\n)\n)",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Known Manganese IP and UserAgent activity",
+    "enabled": true,
+    "description": "Matches IP plus UserAgent IOCs in OfficeActivity data, along with IP plus Connection string information in the CommonSecurityLog data related to Manganese group activity.\nReferences: \nhttps://kb.pulsesecure.net/articles/Pulse_Security_Advisories/SA44101/\nhttps://fortiguard.com/psirt/FG-IR-18-384",
+    "tactics": [
+      "InitialAccess",
+      "Collection"
+    ],
+    "alertRuleTemplateName": "a04cf847-a832-4c60-b687-b0b6147da219",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
+  },
+  {
+    "severity": "High",
+    "query": "let timeframe = 1d;\nlet DomainNames = dynamic([\"yahoo-verification.org\",\"support-servics.com\",\"verification-live.com\",\"com-mailbox.com\",\"com-myaccuants.com\",\"notification-accountservice.com\",\n\"accounts-web-mail.com\",\"customer-certificate.com\",\"session-users-activities.com\",\"user-profile-credentials.com\",\"verify-linke.com\",\"support-servics.net\",\"verify-linkedin.net\", \n\"yahoo-verification.net\",\"yahoo-verify.net\",\"outlook-verify.net\",\"com-users.net\",\"verifiy-account.net\",\"te1egram.net\",\"account-verifiy.net\",\"myaccount-services.net\",\n\"com-identifier-servicelog.name\",\"microsoft-update.bid\",\"outlook-livecom.bid\",\"update-microsoft.bid\",\"documentsfilesharing.cloud\",\"com-microsoftonline.club\",\n\"confirm-session-identifier.info\",\"session-management.info\",\"confirmation-service.info\",\"document-share.info\",\"broadcast-news.info\",\"customize-identity.info\",\"webemail.info\",\n\"com-identifier-servicelog.info\",\"documentsharing.info\",\"notification-accountservice.info\",\"identifier-activities.info\",\"documentofficupdate.info\",\"recoveryusercustomer.info\",\n\"serverbroadcast.info\",\"account-profile-users.info\",\"account-service-management.info\",\"accounts-manager.info\",\"activity-confirmation-service.info\",\"com-accountidentifier.info\",\n\"com-privacy-help.info\",\"com-sessionidentifier.info\",\"com-useraccount.info\",\"confirmation-users-service.info\",\"confirm-identity.info\",\"confirm-session-identification.info\",\n\"continue-session-identifier.info\",\"customer-recovery.info\",\"customers-activities.info\",\"elitemaildelivery.info\",\"email-delivery.info\",\"identify-user-session.info\",\n\"message-serviceprovider.info\",\"notificationapp.info\",\"notification-manager.info\",\"recognized-activity.info\",\"recover-customers-service.info\",\"recovery-session-change.info\",\n\"service-recovery-session.info\",\"service-session-continue.info\",\"session-mail-customers.info\",\"session-managment.info\",\"session-verify-user.info\",\"shop-sellwear.info\",\n\"supportmailservice.info\",\"terms-service-notification.info\",\"user-activity-issues.info\",\"useridentity-confirm.info\",\"users-issue-services.info\",\"verify-user-session.info\",\n\"login-gov.info\",\"notification-signal-agnecy.info\",\"notifications-center.info\",\"identifier-services-sessions.info\",\"customers-manager.info\",\"session-manager.info\",\n\"customer-managers.info\",\"confirmation-recovery-options.info\",\"service-session-confirm.info\",\"session-recovery-options.info\",\"services-session-confirmation.info\",\n\"notification-managers.info\",\"activities-services-notification.info\",\"activities-recovery-options.info\",\"activity-session-recovery.info\",\"customers-services.info\",\n\"sessions-notification.info\",\"download-teamspeak.info\",\"services-issue-notification.info\",\"microsoft-upgrade.mobi\",\"broadcastnews.pro\",\"mobile-messengerplus.network\"]);\nlet IPList = dynamic([\"51.91.200.147\"]);\nlet IPRegex = '[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}';\n(union isfuzzy=true\n(CommonSecurityLog \n| where TimeGenerated >= ago(timeframe)\n| parse Message with * '(' DNSName ')' * \n| extend MessageIP = extract(IPRegex, 0, Message)\n| extend RequestURLIP = extract(IPRegex, 0, Message)\n| where (isnotempty(SourceIP) and SourceIP in (IPList)) or (isnotempty(DestinationIP) and DestinationIP in (IPList)) \nor (isnotempty(DNSName) and DNSName in~ (DomainNames)) or (isnotempty(DestinationHostName) and DestinationHostName in~ (DomainNames)) or (isnotempty(RequestURL) and (RequestURL has_any (DomainNames) or RequestURLIP in (IPList))) \nor (isnotempty(Message) and MessageIP in (IPList))\n| extend IPMatch = case(SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", MessageIP in (IPList), \"Message\", RequestURLIP in (IPList), \"RequestUrl\", \"NoMatch\") \n| extend timestamp = TimeGenerated , IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP,IPMatch == \"Message\", MessageIP,\nIPMatch == \"RequestUrl\", RequestURLIP,\"NoMatch\"), Account = SourceUserID, Host = DeviceName\n),\n(DnsEvents \n| where TimeGenerated >= ago(timeframe) \n| extend DestinationIPAddress = IPAddresses, DNSName = Name, Host = Computer\n| where  DestinationIPAddress in (IPList) or DNSName in~ (DomainNames) \n| extend timestamp = TimeGenerated, IPCustomEntity = DestinationIPAddress, HostCustomEntity = Host),\n(VMConnection \n| where TimeGenerated >= ago(timeframe) \n| parse RemoteDnsCanonicalNames with * '[\"' DNSName '\"]' *\n| where isnotempty(SourceIP) or isnotempty(DestinationIP) or isnotempty(DNSName)\n| where SourceIP in (IPList) or DestinationIP in (IPList) or DNSName in~ (DomainNames)\n| extend IPMatch = case( SourceIP in (IPList), \"SourceIP\", DestinationIP in (IPList), \"DestinationIP\", \"None\") \n| extend timestamp = TimeGenerated , IPCustomEntity = case(IPMatch == \"SourceIP\", SourceIP, IPMatch == \"DestinationIP\", DestinationIP, \"None\"), Host = Computer),\n(OfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| extend SourceIPAddress = ClientIP, Account = UserId\n| where  SourceIPAddress in (IPList)\n| extend timestamp = TimeGenerated , IPCustomEntity = SourceIPAddress , AccountCustomEntity = Account )\n)",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Known Phosphorus group domains/IP",
+    "enabled": true,
+    "description": "Matches domain name IOCs related to Phosphorus group activity with CommonSecurityLog, DnsEvents, OfficeActivity and VMConnection dataTypes.\nReferences: https://blogs.microsoft.com/on-the-issues/2019/03/27/new-steps-to-protect-customers-from-hacking/.",
+    "tactics": [
+      "CommandAndControl"
+    ],
+    "alertRuleTemplateName": "155f40c6-610d-497d-85fc-3cf06ec13256",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let threshold = 5;\nlet szSharePointFileOperation = \"SharePointFileOperation\";\nlet szOperations = dynamic([\"FileDownloaded\", \"FileUploaded\"]);\nlet starttime = 14d;\nlet endtime = 1d;\nlet historicalActivity =\nOfficeActivity\n| where TimeGenerated between(ago(starttime)..ago(endtime))\n| where RecordType =~ szSharePointFileOperation\n| where Operation in~ (szOperations)\n| where isnotempty(UserAgent)\n| summarize historicalCount = count() by UserAgent, RecordType, Operation;\nlet recentActivity = OfficeActivity\n| where RecordType =~ szSharePointFileOperation\n| where Operation in~ (szOperations)\n| where TimeGenerated > ago(endtime)\n| where isnotempty(UserAgent)\n| summarize min(Start_Time), max(Start_Time), recentCount = count() by UserAgent, RecordType, Operation;\nlet RareUserAgent = recentActivity | join kind = leftanti (historicalActivity) on UserAgent\n| order by recentCount desc, UserAgent\n// More than 3 downloads/uploads from a new user agent today\n| where recentCount > threshold;\nOfficeActivity \n| where TimeGenerated > ago(endtime) \n| where RecordType =~ szSharePointFileOperation \n| where Operation in~ (szOperations)\n| where isnotempty(UserAgent)\n| join kind= inner (RareUserAgent)\non UserAgent, RecordType, Operation    \n| where Start_Time between(min_Start_Time .. max_Start_Time)\n| summarize StartTimeUtc = min(min_Start_Time), EndTimeUtc = max(max_Start_Time) by RecordType, Operation, UserAgent, UserType, UserId, ClientIP, OfficeWorkload, Site_Url, OfficeObjectId, UserAgentSeenCount = recentCount\n| extend timestamp = StartTimeUtc, AccountCustomEntity = UserId, IPCustomEntity = ClientIP, URLCustomEntity = Site_Url\n| order by UserAgentSeenCount desc, UserAgent asc, Operation asc, UserId asc",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "SharePointFileOperation via devices with previously unseen user agents",
+    "enabled": true,
+    "description": "Identifies if the number of documents uploaded or downloaded from device(s) associated\nwith a previously unseen user agent exceeds a threshold (default is 5).",
+    "tactics": [
+      "Exfiltration"
+    ],
+    "alertRuleTemplateName": "5dd76a87-9f87-4576-bab3-268b0e2b338b",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let starttime = 14d;\nlet endtime = 1d;\nlet timeframe = 1h;\nlet scorethreshold = 1.5;\nlet percentthreshold = 50;\n// Preparing the time series data aggregated hourly count of MailItemsAccessd Operation in the form of multi-value array to use with time series anomaly function.\nlet TimeSeriesData = \nOfficeActivity \n| where TimeGenerated  between (startofday(ago(starttime))..startofday(ago(endtime)))\n| where OfficeWorkload=~ \"Exchange\" and Operation =~ \"MailItemsAccessed\" and ResultStatus =~ \"Succeeded\"\n| project TimeGenerated, Operation, MailboxOwnerUPN \n| make-series Total=count() on TimeGenerated from startofday(ago(starttime)) to startofday(ago(endtime)) step timeframe;\nlet TimeSeriesAlerts = TimeSeriesData\n| extend (anomalies, score, baseline) = series_decompose_anomalies(Total, scorethreshold, -1, 'linefit')\n| mv-expand Total to typeof(double), TimeGenerated to typeof(datetime), anomalies to typeof(double), score to typeof(double), baseline to typeof(long)\n| where anomalies > 0\n| project TimeGenerated, Total, baseline, anomalies, score;\n// Joining the flagged outlier from the previous step with the original dataset to present contextual information\n// during the anomalyhour to analysts to conduct investigation or informed decisions.\nTimeSeriesAlerts | where TimeGenerated > ago(2d)\n// Join against base logs since specified timeframe to retrive records associated with the hour of anomoly\n| join ( \n    OfficeActivity \n| where TimeGenerated > ago(2d)\n| where OfficeWorkload=~ \"Exchange\" and Operation =~ \"MailItemsAccessed\" and ResultStatus =~ \"Succeeded\"\n) on TimeGenerated",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Exchange workflow MailItemsAccessed operation anomaly",
+    "enabled": true,
+    "description": "Identifies anomalous increases in Exchange mail items accessed operations. \nThe query leverages KQL built-in anomaly detection algorithms to find large deviations from baseline patterns. \nSudden increases in execution frequency of sensitive actions should be further investigated for malicious activity.\nManually change scorethreshold from 1.5 to 3 or higher to reduce the noise based on outliers flagged from the query criteria.\nRead more about MailItemsAccessed- https://docs.microsoft.com/microsoft-365/compliance/advanced-audit?view=o365-worldwide#mailitemsaccessed",
+    "tactics": [
+      "Collection"
+    ],
+    "alertRuleTemplateName": "b4ceb583-4c44-4555-8ecf-39f572e827ba",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Low",
+    "query": "let starttime = 14d;\nlet endtime = 1d;\nlet UserAgentAll = \n(union isfuzzy=true\n(OfficeActivity\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(UserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent, SourceIP = ClientIP, Account = UserId, Type, RecordType, Operation\n),\n(\nW3CIISLog\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(csUserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent = csUserAgent, SourceIP = cIP, Account = csUserName, Type, sSiteName, csMethod, csUriStem\n),\n(\nAWSCloudTrail\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(UserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent, SourceIP = SourceIpAddress, Account = UserIdentityUserName, Type, EventSource, EventName\n))\n// remove wordSize blocks of non-numeric hex characters prior to word extraction\n| extend UserAgentNoHexAlphas = replace(\"([A-Fa-f]{4,})\", \"x\", UserAgent)\n// once blocks of hex chars are removed, extract wordSize blocks of a-z\n| extend Tokens = extract_all(\"([A-Za-z]{4,})\", UserAgentNoHexAlphas)\n// concatenate extracted words to create a summarized user agent for baseline and comparison\n| extend NormalizedUserAgent = strcat_array(Tokens, \"|\")\n| project-away UserAgentNoHexAlphas, Tokens;\nUserAgentAll\n| where StartTime >= ago(endtime)\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), count() by UserAgent, NormalizedUserAgent, SourceIP, Account, Type, RecordType, Operation, EventSource, EventName, sSiteName, csMethod, csUriStem\n| join kind=leftanti\n(\nUserAgentAll\n| where StartTime < ago(endtime)\n| summarize by NormalizedUserAgent, SourceIP, Account, Type, RecordType, Operation, EventSource, EventName, sSiteName, csMethod, csUriStem\n)\non NormalizedUserAgent\n| extend timestamp = StartTime, IPCustomEntity = SourceIP, AccountCustomEntity = Account",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "New UserAgent observed in last 24 hours",
+    "enabled": true,
+    "description": "Identifies new UserAgents observed in the last 24 hours versus the previous 14 days. This detection \nextracts words from user agents to build the baseline and determine rareity rather than perform a \ndirect comparison. This avoids FPs caused by version numbers and other high entropy user agent components.\nThese new UserAgents could be benign. However, in normally stable environments,\nthese new UserAgents could provide a starting point for investigating malicious activity.\nNote: W3CIISLog can be noisy depending on the environment, however OfficeActivity and AWSCloudTrail are\nusually stable with low numbers of detections.",
+    "tactics": [
+      "InitialAccess",
+      "CommandAndControl",
+      "Execution"
+    ],
+    "alertRuleTemplateName": "b725d62c-eb77-42ff-96f6-bdc6745fc6e0",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "// a threshold can be enabled, see commented line below for PrevSeenCount\nlet threshold = 2;\nlet uploadOp = 'FileUploaded';\n// Extensions that are interesting. Add/Remove to this list as you see fit\nlet execExt = dynamic(['exe', 'inf', 'gzip', 'cmd', 'bat']);\nlet starttime = 8d;\nlet endtime = 1d;\nOfficeActivity | where TimeGenerated >= ago(endtime)\n// Limited to File Uploads due to potential noise, comment out the Operation statement below to include any operation type\n// Additional, but potentially noisy operation types that include Uploads and Downloads can be included by adding the following - Operation contains \"upload\" or Operation contains \"download\"\n| where Operation =~ uploadOp\n| where SourceFileExtension has_any (execExt)\n| project TimeGenerated, OfficeId, OfficeWorkload, RecordType, Operation, UserType, UserKey, UserId, ClientIP, UserAgent, Site_Url, SourceRelativeUrl, SourceFileName\n| join kind= leftanti (\nOfficeActivity | where TimeGenerated between (ago(starttime) .. ago(endtime))\n| where Operation =~ uploadOp\n| where SourceFileExtension has_any (execExt)\n| summarize SourceRelativeUrl = make_set(SourceRelativeUrl), UserId = make_set(UserId) , PrevSeenCount = count() by SourceFileName\n// To exclude previous matches when only above a specific count, change threshold above and uncomment the line below\n//| where PrevSeenCount > threshold\n| mvexpand SourceRelativeUrl, UserId\n| extend SourceRelativeUrl = tostring(SourceRelativeUrl), UserId = tostring(UserId)\n) on SourceFileName, SourceRelativeUrl, UserId \n| extend SiteUrlUserFolder = tolower(split(Site_Url, '/')[-2])\n| extend UserIdUserFolderFormat = tolower(replace('@|\\\\.', '_',UserId))\n// identify when UserId is not a match to the specific site url personal folder reference\n| extend UserIdDiffThanUserFolder = iff(Site_Url has '/personal/' and SiteUrlUserFolder != UserIdUserFolderFormat, true , false ) \n| summarize TimeGenerated = make_list(TimeGenerated), StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), \nUserAgents = make_list(UserAgent), OfficeIds = make_list(OfficeId), SourceRelativeUrls = make_list(SourceRelativeUrl), FileNames = make_list(SourceFileName)\nby OfficeWorkload, RecordType, Operation, UserType, UserKey, UserId, ClientIP, Site_Url, SiteUrlUserFolder, UserIdUserFolderFormat, UserIdDiffThanUserFolder",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P8D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "New executable via Office FileUploaded Operation",
+    "enabled": true,
+    "description": "Identifies when executable file types are uploaded to Office services such as SharePoint and OneDrive.\nList currently includes 'exe', 'inf', 'gzip', 'cmd', 'bat' file extensions.\nAdditionally, identifies when a given user is uploading these files to another users workspace.\nThis may be indication of a staging location for malware or other malicious activity.",
+    "tactics": [
+      "CommandAndControl"
+    ],
+    "alertRuleTemplateName": "d722831e-88f5-4e25-b106-4ef6e29f8c13",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nOfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| where Operation in~ ( \"Add-MailboxPermission\", \"Add-MailboxFolderPermission\", \"Set-Mailbox\", \"New-ManagementRoleAssignment\")\nand not(UserId has_any ('NT AUTHORITY\\\\SYSTEM (Microsoft.Exchange.ServiceHost)','devilfish-applicationaccount') and Operation in~ ( \"Add-MailboxPermission\", \"Set-Mailbox\"))\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Rare and potentially high-risk Office operations",
+    "enabled": true,
+    "description": "Identifies Office operations that are typically rare and can provide capabilities useful to attackers.",
+    "tactics": [
+      "Persistence",
+      "Collection"
+    ],
+    "alertRuleTemplateName": "957cb240-f45d-4491-9ba5-93430a3c08be",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "// Adjust this value to change how many Teams should be deleted before including\nlet max_delete_count = 3;\n// Adjust this value to change the timewindow the query runs over\n  OfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\" \n| where Operation =~ \"TeamDeleted\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), DeletedTeams = make_set(TeamName) by UserId\n| where array_length(DeletedTeams) > max_delete_count\n| extend timestamp = StartTime, AccountCustomEntity = UserId",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Multiple Teams deleted by a single user",
+    "enabled": true,
+    "description": "This detection flags the occurrences of deleting multiple teams within an hour.\nThis data is a part of Office 365 Connector in Azure Sentinel.",
+    "tactics": [
+      "Impact"
+    ],
+    "alertRuleTemplateName": "173f8699-6af5-484a-8b06-8c47ba89b380",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nlet PerUserThreshold = 5;\nlet TotalThreshold = 100;\nlet action = dynamic([\"change\", \"changed\", \"reset\"]);\nlet pWord = dynamic([\"password\", \"credentials\"]);\nlet PasswordResetMultiDataSource =\n(union isfuzzy=true\n(//Password reset events\n//4723: An attempt was made to change an account's password\n//4724: An attempt was made to reset an accounts password\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID in (\"4723\",\"4724\")\n| project TimeGenerated, Computer, AccountType, Account, Type),\n(//Azure Active Directory Password reset events\nAuditLogs\n| where TimeGenerated >= ago(timeframe)\n| where OperationName has_any (pWord) and OperationName has_any (action)\n| extend AccountType = tostring(TargetResources[0].type), Account = tostring(TargetResources[0].userPrincipalName), \nTargetResourceName = tolower(tostring(TargetResources[0].displayName))\n| project TimeGenerated, AccountType, Account, Computer = TargetResourceName, Type),\n(//OfficeActive ActiveDirectory Password reset events\nOfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| where OfficeWorkload == \"AzureActiveDirectory\" \n| where (ExtendedProperties has_any (pWord) or ModifiedProperties has_any (pWord)) and (ExtendedProperties has_any (action) or ModifiedProperties has_any (action))\n| extend AccountType = UserType, Account = OfficeObjectId \n| project TimeGenerated, AccountType, Account, Type, Computer = \"\"),\n(// Unix syslog password reset events\nSyslog\n| where TimeGenerated >= ago(timeframe)\n| where Facility in (\"auth\",\"authpriv\")\n| where SyslogMessage has_any (pWord) and SyslogMessage has_any (action)\n| extend AccountType = iif(SyslogMessage contains \"root\", \"Root\", \"Non-Root\")\n| parse SyslogMessage with * \"password changed for\" Account\n| project TimeGenerated, AccountType, Account, Computer = HostName, Type),\n(SigninLogs\n| where TimeGenerated >= ago(timeframe)\n| where OperationName =~ \"Sign-in activity\" and ResultType has_any (\"50125\", \"50133\")\n| project TimeGenerated, AccountType = AppDisplayName, Computer = IPAddress, Account = UserPrincipalName, Type\n)\n);\nlet pwrmd = PasswordResetMultiDataSource\n| project TimeGenerated, Computer, AccountType, Account, Type;\n(union isfuzzy=true  \n(pwrmd\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), Computer = makeset(Computer), AccountType = makeset(AccountType), Total=count() by Account, Type\n| where Total > PerUserThreshold\n| extend ResetPivot = \"PerUserReset\"),  \n(pwrmd\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), Computer = makeset(Computer), Account = tostring(makeset(Account)), AccountType = makeset(AccountType), Total=count() by Type\n| where Total > TotalThreshold\n| extend ResetPivot = \"TotalUserReset\")\n)\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = tostring(Computer)",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Multiple Password Reset by user",
+    "enabled": true,
+    "description": "This query will determine multiple password resets by user across multiple data sources. \nAccount manipulation including password reset may aid adversaries in maintaining access to credentials \nand certain permission levels within an environment.",
+    "tactics": [
+      "InitialAccess",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "0b9ae89d-8cad-461c-808f-0494f70ad5c4",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let starttime = 14d;\nlet endtime = 1d;\nlet UserAgentAll = \n(union isfuzzy=true\n(OfficeActivity\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(UserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent, SourceIP = ClientIP, Account = UserId, Type, RecordType, Operation\n),\n(\nW3CIISLog\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(csUserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent = csUserAgent, SourceIP = cIP, Account = csUserName, Type, sSiteName, csMethod, csUriStem\n),\n(\nAWSCloudTrail\n| where TimeGenerated >= ago(starttime)\n| where isnotempty(UserAgent)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserAgent, SourceIP = SourceIpAddress, Account = UserIdentityUserName, Type, EventSource, EventName\n))\n// remove wordSize blocks of non-numeric hex characters prior to word extraction\n| extend UserAgentNoHexAlphas = replace(\"([A-Fa-f]{4,})\", \"x\", UserAgent)\n// once blocks of hex chars are removed, extract wordSize blocks of a-z\n| extend Tokens = extract_all(\"([A-Za-z]{4,})\", UserAgentNoHexAlphas)\n// concatenate extracted words to create a summarized user agent for baseline and comparison\n| extend NormalizedUserAgent = strcat_array(Tokens, \"|\")\n| project-away UserAgentNoHexAlphas, Tokens;\nUserAgentAll\n| where StartTime >= ago(endtime)\n| summarize StartTime = min(StartTime), EndTime = max(EndTime), count() by UserAgent, NormalizedUserAgent, SourceIP, Account, Type, RecordType, Operation, EventSource, EventName, sSiteName, csMethod, csUriStem\n| join kind=leftanti\n(\nUserAgentAll\n| where StartTime < ago(endtime)\n| summarize by NormalizedUserAgent, SourceIP, Account, Type, RecordType, Operation, EventSource, EventName, sSiteName, csMethod, csUriStem\n)\non NormalizedUserAgent\n| extend timestamp = StartTime, IPCustomEntity = SourceIP, AccountCustomEntity = Account",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "New UserAgent observed in last 24 hours",
+    "enabled": true,
+    "description": "Identifies new UserAgents observed in the last 24 hours versus the previous 14 days. This detection \nextracts words from user agents to build the baseline and determine rareity rather than perform a \ndirect comparison. This avoids FPs caused by version numbers and other high entropy user agent components.\nThese new UserAgents could be benign. However, in normally stable environments,\nthese new UserAgents could provide a starting point for investigating malicious activity.\nNote: W3CIISLog can be noisy depending on the environment, however OfficeActivity and AWSCloudTrail are\nusually stable with low numbers of detections.",
+    "tactics": [
+      "InitialAccess",
+      "CommandAndControl",
+      "Execution"
+    ],
+    "alertRuleTemplateName": "b725d62c-eb77-42ff-96f6-bdc6745fc6e0",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 1d;\nlet PerUserThreshold = 5;\nlet TotalThreshold = 100;\nlet action = dynamic([\"change\", \"changed\", \"reset\"]);\nlet pWord = dynamic([\"password\", \"credentials\"]);\nlet PasswordResetMultiDataSource =\n(union isfuzzy=true\n(//Password reset events\n//4723: An attempt was made to change an account's password\n//4724: An attempt was made to reset an accounts password\nSecurityEvent\n| where TimeGenerated >= ago(timeframe)\n| where EventID in (\"4723\",\"4724\")\n| project TimeGenerated, Computer, AccountType, Account, Type),\n(//Azure Active Directory Password reset events\nAuditLogs\n| where TimeGenerated >= ago(timeframe)\n| where OperationName has_any (pWord) and OperationName has_any (action)\n| extend AccountType = tostring(TargetResources[0].type), Account = tostring(TargetResources[0].userPrincipalName), \nTargetResourceName = tolower(tostring(TargetResources[0].displayName))\n| project TimeGenerated, AccountType, Account, Computer = TargetResourceName, Type),\n(//OfficeActive ActiveDirectory Password reset events\nOfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| where OfficeWorkload == \"AzureActiveDirectory\" \n| where (ExtendedProperties has_any (pWord) or ModifiedProperties has_any (pWord)) and (ExtendedProperties has_any (action) or ModifiedProperties has_any (action))\n| extend AccountType = UserType, Account = OfficeObjectId \n| project TimeGenerated, AccountType, Account, Type, Computer = \"\"),\n(// Unix syslog password reset events\nSyslog\n| where TimeGenerated >= ago(timeframe)\n| where Facility in (\"auth\",\"authpriv\")\n| where SyslogMessage has_any (pWord) and SyslogMessage has_any (action)\n| extend AccountType = iif(SyslogMessage contains \"root\", \"Root\", \"Non-Root\")\n| parse SyslogMessage with * \"password changed for\" Account\n| project TimeGenerated, AccountType, Account, Computer = HostName, Type),\n(SigninLogs\n| where TimeGenerated >= ago(timeframe)\n| where OperationName =~ \"Sign-in activity\" and ResultType has_any (\"50125\", \"50133\")\n| project TimeGenerated, AccountType = AppDisplayName, Computer = IPAddress, Account = UserPrincipalName, Type\n)\n);\nlet pwrmd = PasswordResetMultiDataSource\n| project TimeGenerated, Computer, AccountType, Account, Type;\n(union isfuzzy=true  \n(pwrmd\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), Computer = makeset(Computer), AccountType = makeset(AccountType), Total=count() by Account, Type\n| where Total > PerUserThreshold\n| extend ResetPivot = \"PerUserReset\"),  \n(pwrmd\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), Computer = makeset(Computer), Account = tostring(makeset(Account)), AccountType = makeset(AccountType), Total=count() by Type\n| where Total > TotalThreshold\n| extend ResetPivot = \"TotalUserReset\")\n)\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = tostring(Computer)",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Multiple Password Reset by user",
+    "enabled": true,
+    "description": "This query will determine multiple password resets by user across multiple data sources. \nAccount manipulation including password reset may aid adversaries in maintaining access to credentials \nand certain permission levels within an environment.",
+    "tactics": [
+      "InitialAccess",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "0b9ae89d-8cad-461c-808f-0494f70ad5c4",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 7d;\nOfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| where Operation =~ \"Set-Mailbox\"\n| where Parameters has \"ForwardingSmtpAddress\"\n| extend parsed = parse_json(Parameters)\n| mv-expand parsed\n| where parsed.Name == \"ForwardingSmtpAddress\"\n| extend parameterName = tostring(parsed.Name), fwdingDestination = tostring(parsed.Value)\n| where isnotempty(fwdingDestination)\n| extend ClientIPOnly = case( \nClientIP has \".\" and ClientIP has ':', tostring(split(ClientIP,\":\")[0]), \nClientIP has \".\" and ClientIP has '-', tostring(split(ClientIP,\"-\")[0]), \nClientIP has ']-', tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))),\nClientIP has ']:', tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))),\nisempty(ClientIP) and ClientIP_ has \".\" and ClientIP_ has ':', tostring(split(ClientIP_,\":\")[0]), \nisempty(ClientIP) and ClientIP_ has \".\" and ClientIP_ has '-', tostring(split(ClientIP_,\"-\")[0]), \nisempty(ClientIP) and ClientIP_ has ']-', tostring(trim_start(@'[[]',tostring(split(ClientIP_,\"]\")[0]))),\nisempty(ClientIP) and ClientIP_ has ']:', tostring(trim_start(@'[[]',tostring(split(ClientIP_,\"]\")[0]))),\nisnotempty(ClientIP), ClientIP,\nisnotempty(ClientIP_), ClientIP_,\n\"IP Not Available\"\n)  \n| extend Port = case(\nClientIP has \".\" and ClientIP has ':', tostring(split(ClientIP,\":\")[1]), \nClientIP has \".\" and ClientIP has '-', tostring(split(ClientIP,\"-\")[1]), \nClientIP has ']-', tostring(split(ClientIP,\"]-\")[1]), \nClientIP has ']:', tostring(split(ClientIP,\"]:\")[1]), \nisempty(ClientIP) and ClientIP_ has \".\" and ClientIP_ has ':', tostring(split(ClientIP_,\":\")[1]), \nisempty(ClientIP) and ClientIP_ has \".\" and ClientIP_ has '-', tostring(split(ClientIP_,\"-\")[1]), \nisempty(ClientIP) and ClientIP_ has ']-', tostring(split(ClientIP_,\"]-\")[1]),\nisempty(ClientIP) and ClientIP_ has ']:', tostring(split(ClientIP_,\"]:\")[1]),\nisnotempty(ClientIP), ClientIP,\nisnotempty(ClientIP_), ClientIP_,\n\"IP Not Available\"\n)\n| extend UserId = iff(isempty(UserId), UserId_, UserId)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), DistinctUserCount = dcount(UserId), UserId = make_set(UserId), \nPorts = make_set(Port), EventCount = count() by fwdingDestination, ClientIP = ClientIPOnly \n| where DistinctUserCount > 1\n| mv-expand UserId\n| extend UserId = tostring(UserId), Ports = tostring(Ports)\n| distinct StartTimeUtc, EndTimeUtc, UserId, DistinctUserCount, ClientIP, Ports, fwdingDestination, EventCount\n| extend timestamp = StartTimeUtc, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P7D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Multiple users email forwarded to same destination",
+    "enabled": true,
+    "description": "Identifies when multiple (more than one) users mailboxes are configured to forward to the same destination. \nThis could be an attacker-controlled destination mailbox configured to collect mail from multiple compromised user accounts.",
+    "tactics": [
+      "Collection",
+      "Exfiltration"
+    ],
+    "alertRuleTemplateName": "871ba14c-88ef-48aa-ad38-810f26760ca3",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let threshold = 50;\nlet szSharePointFileOperation = \"SharePointFileOperation\";\nlet szOperations = dynamic([\"FileDownloaded\", \"FileUploaded\"]);\nlet starttime = 14d;\nlet endtime = 1d;\nlet historicalActivity =\nOfficeActivity\n| where TimeGenerated between(ago(starttime)..ago(endtime))\n| where RecordType =~ szSharePointFileOperation\n| where Operation in~ (szOperations)\n| summarize historicalCount = count() by ClientIP, RecordType, Operation;\nlet recentActivity = OfficeActivity\n| where TimeGenerated > ago(endtime)\n| where RecordType =~ szSharePointFileOperation\n| where Operation in~ (szOperations)\n| summarize min(Start_Time), max(Start_Time), recentCount = count() by ClientIP, RecordType, Operation;\nlet RareIP = recentActivity | join kind= leftanti ( historicalActivity ) on ClientIP, RecordType, Operation\n// More than 50 downloads/uploads from a new IP\n| where recentCount > threshold;\nOfficeActivity \n| where TimeGenerated >= ago(endtime) \n| where RecordType =~ szSharePointFileOperation\n| where Operation in~ (szOperations)\n| join kind= inner (RareIP) on ClientIP, RecordType, Operation\n| where Start_Time between(min_Start_Time .. max_Start_Time)\n| summarize StartTimeUtc = min(min_Start_Time), EndTimeUtc = max(max_Start_Time) by RecordType, Operation, UserType, UserId, ClientIP, OfficeWorkload, Site_Url, OfficeObjectId, UserAgent, IPSeenCount = recentCount\n| extend timestamp = StartTimeUtc, AccountCustomEntity = UserId, IPCustomEntity = ClientIP, URLCustomEntity = Site_Url\n| order by IPSeenCount desc, ClientIP asc, Operation asc, UserId asc",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "SharePointFileOperation via previously unseen IPs",
+    "enabled": true,
+    "description": "Identifies when the volume of documents uploaded to or downloaded from Sharepoint by new IP addresses\nexceeds a threshold (default is 50).",
+    "tactics": [
+      "Exfiltration"
+    ],
+    "alertRuleTemplateName": "4b11568b-3f5f-4ba1-80c8-7f1dc8390eb7",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let endtime = 1d;\n(union isfuzzy=true\n(OfficeActivity | where TimeGenerated >= ago(endtime) | where UserAgent != \"\"),\n(OfficeActivity\n| where TimeGenerated >= ago(endtime)\n| where RecordType in (\"AzureActiveDirectoryAccountLogon\", \"AzureActiveDirectoryStsLogon\")\n| extend OperationName = Operation, UserAgent = extractjson(\"$[0].Value\", ExtendedProperties, typeof(string))),\n(AzureDiagnostics\n| where TimeGenerated >= ago(endtime)\n| where ResourceType =~ \"APPLICATIONGATEWAYS\" \n| where OperationName =~ \"ApplicationGatewayAccess\" \n| extend ClientIP = columnifexists(\"clientIP_s\", \"None\"), UserAgent = columnifexists(\"userAgent_s\", \"None\")))\n// Likely artefact of hardcoding\n| where UserAgent startswith \"User\" or UserAgent startswith \"\\\"\"\n// Incorrect casing\nor (UserAgent startswith \"Mozilla\" and not(UserAgent containscs \"Mozilla\"))\n// Incorrect casing\nor UserAgent containscs  \"(Compatible;\"\n// Missing MSIE version\nor UserAgent matches regex @\"MSIE\\s?;\"\n// Incorrect spacing around MSIE version\nor UserAgent matches regex  @\"MSIE(?:\\d|.{1,5}?\\d\\s;)\"\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), OperationNames = makeset(OperationName), UserAgentCount = dcount(UserAgent), \nUserAgentList = makeset(UserAgent), RecordTypes = makeset(RecordType) by UserId, ClientIP\n| extend timestamp = StartTimeUtc, IPCustomEntity = ClientIP, AccountCustomEntity = UserId",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Malformed user agent",
+    "enabled": true,
+    "description": "Malware authors will sometimes hardcode user agent string values when writing the network communication component of their malware.\nMalformed user agents can be an indication of such malware.",
+    "tactics": [
+      "InitialAccess",
+      "CommandAndControl",
+      "Execution"
+    ],
+    "alertRuleTemplateName": "a357535e-f722-4afe-b375-cff362b2b376",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nOfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| where OfficeWorkload == \"Exchange\"\n| where Operation in~ (\"New-TransportRule\", \"Set-TransportRule\")\n| extend p = parse_json(Parameters)\n| extend RuleName = case(\n  Operation =~ \"Set-TransportRule\", tostring(OfficeObjectId),\n  Operation =~ \"New-TransportRule\", tostring(p[1].Value),\n  \"Unknown\"\n  ) \n| mvexpand p\n| where (p.Name =~ \"BlindCopyTo\" or p.Name =~ \"RedirectMessageTo\") and isnotempty(p.Value)\n| extend RedirectTo = p.Value\n| extend ClientIPOnly = case( \n  ClientIP has \".\" and ClientIP has \":\", tostring(split(ClientIP,\":\")[0]), \n  ClientIP has \".\" and ClientIP has \"-\", tostring(split(ClientIP,\"-\")[0]), \n  ClientIP has \"[\", tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))),\n  ClientIP\n  )  \n| extend Port = case(\n  ClientIP has \".\" and ClientIP has \":\", (split(ClientIP,\":\")[1]),\n  ClientIP has \".\" and ClientIP has \"-\", (split(ClientIP,\"-\")[1]),\n  ClientIP has \"[\" and ClientIP has \":\", tostring(split(ClientIP,\"]:\")[1]),\n  ClientIP has \"[\" and ClientIP has \"-\", tostring(split(ClientIP,\"]-\")[1]),\n  ClientIP\n  )\n| extend ClientIP = ClientIPOnly\n| project TimeGenerated, RedirectTo, ClientIP, Port, UserId, Operation, RuleName\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Mail redirect via ExO transport rule",
+    "enabled": true,
+    "description": "Identifies when Exchange Online transport rule configured to forward emails.\nThis could be an adversary mailbox configured to collect mail from multiple user accounts.",
+    "tactics": [
+      "Collection",
+      "Exfiltration"
+    ],
+    "alertRuleTemplateName": "500415fb-bba7-4227-a08a-9857fb61b6a7",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nOfficeActivity\n| where TimeGenerated >= ago(timeframe)\n| where RecordType =~ \"ExchangeAdmin\"\n| where UserType in~ (\"Admin\",\"DcAdmin\") \n// Only admin or global-admin can disable/remove policy\n| where Operation startswith \"Remove-\" or Operation startswith \"Disable-\"\n| where Operation has_any (\"AntiPhish\", \"SafeAttachment\", \"SafeLinks\", \"Dlp\", \"Audit\")\n| extend ClientIPOnly = case( \nClientIP has \".\", tostring(split(ClientIP,\":\")[0]), \nClientIP has \"[\", tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))),\nClientIP\n)  \n| extend Port = case(\nClientIP has \".\", (split(ClientIP,\":\")[1]),\nClientIP has \"[\", tostring(split(ClientIP,\"]:\")[1]),\nClientIP\n)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), OperationCount = count() by Operation, UserType, UserId, ClientIP = ClientIPOnly, Port, ResultStatus, Parameters\n| extend timestamp = StartTimeUtc, AccountCustomEntity = UserId, IPCustomEntity = ClientIP",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Office policy tampering",
+    "enabled": true,
+    "description": "Identifies if any tampering is done to either auditlog, ATP Safelink, SafeAttachment, AntiPhish or Dlp policy. \nAn adversary may use this technique to evade detection or avoid other policy based defenses.\nReferences: https://docs.microsoft.com/powershell/module/exchange/advanced-threat-protection/remove-antiphishrule?view=exchange-ps.",
+    "tactics": [
+      "Persistence",
+      "DefenseEvasion"
+    ],
+    "alertRuleTemplateName": "fbd72eb8-087e-466b-bd54-1ca6ea08c6d3",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "High",
+    "query": "let timeframe = 1d;\nlet DomainNames = dynamic([\"asyspy256.ddns.net\",\"hotkillmail9sddcc.ddns.net\",\"rosaf112.ddns.net\",\"cvdfhjh1231.myftp.biz\",\"sz2016rose.ddns.net\",\"dffwescwer4325.myftp.biz\",\"cvdfhjh1231.ddns.net\"]);\nlet SHA1Hash = dynamic ([\"53a44c2396d15c3a03723fa5e5db54cafd527635\", \"9c5e496921e3bc882dc40694f1dcc3746a75db19\", \"aeb573accfd95758550cf30bf04f389a92922844\", \"79ef78a797403a4ed1a616c68e07fff868a8650a\", \"4f6f38b4cec35e895d91c052b1f5a83d665c2196\", \"1e8c2cac2e4ce7cbd33c3858eb2e24531cb8a84d\", \"e841a63e47361a572db9a7334af459ddca11347a\", \"c28f606df28a9bc8df75a4d5e5837fc5522dd34d\", \"2e94b305d6812a9f96e6781c888e48c7fb157b6b\", \"dd44133716b8a241957b912fa6a02efde3ce3025\", \"8793bf166cb89eb55f0593404e4e933ab605e803\", \"a39b57032dbb2335499a51e13470a7cd5d86b138\", \"41cc2b15c662bc001c0eb92f6cc222934f0beeea\", \"d209430d6af54792371174e70e27dd11d3def7a7\", \"1c6452026c56efd2c94cea7e0f671eb55515edb0\", \"c6b41d3afdcdcaf9f442bbe772f5da871801fd5a\", \"4923d460e22fbbf165bbbaba168e5a46b8157d9f\", \"f201504bd96e81d0d350c3a8332593ee1c9e09de\", \"ddd2db1127632a2a52943a2fe516a2e7d05d70d2\"]);\nlet SHA256Hash = dynamic ([\"9ae7c4a4e1cfe9b505c3a47e66551eb1357affee65bfefb0109d02f4e97c06dd\", \"7772d624e1aed327abcd24ce2068063da0e31bb1d5d3bf2841fc977e198c6c5b\", \"657fc7e6447e0065d488a7db2caab13071e44741875044f9024ca843fe4e86b5\", \"2ef157a97e28574356e1d871abf75deca7d7a1ea662f38b577a06dd039dbae29\", \"52fd7b90d7144ac448af4008be639d4d45c252e51823f4311011af3207a5fc77\", \"a370e47cb97b35f1ae6590d14ada7561d22b4a73be0cb6df7e851d85054b1ac3\", \"5bf80b871278a29f356bd42af1e35428aead20cd90b0c7642247afcaaa95b022\", \"6f690ccfd54c2b02f0c3cb89c938162c10cbeee693286e809579c540b07ed883\", \"3c884f776fbd16597c072afd81029e8764dd57ee79d798829ca111f5e170bd8e\", \"1922a419f57afb351b58330ed456143cc8de8b3ebcbd236d26a219b03b3464d7\", \"fe0e4ef832b62d49b43433e10c47dc51072959af93963c790892efc20ec422f1\", \"7ce9e1c5562c8a5c93878629a47fe6071a35d604ed57a8f918f3eadf82c11a9c\", \"178d5ee8c04401d332af331087a80fb4e5e2937edfba7266f9be34a5029b6945\", \"51f70956fa8c487784fd21ab795f6ba2199b5c2d346acdeef1de0318a4c729d9\", \"889bca95f1a69e94aaade1e959ed0d3620531dc0fc563be9a8decf41899b4d79\", \"332ddaa00e2eb862742cb8d7e24ce52a5d38ffb22f6c8bd51162bd35e84d7ddf\", \"44bcf82fa536318622798504e8369e9dcdb32686b95fcb44579f0b4efa79df08\", \"63552772fdd8c947712a2cff00dfe25c7a34133716784b6d486227384f8cf3ef\", \"056744a3c371b5938d63c396fe094afce8fb153796a65afa5103e1bffd7ca070\"]);\nlet SigNames = dynamic([\"TrojanDropper:Win32/BlackMould.A!dha\", \"Trojan:Win32/BlackMould.B!dha\", \"Trojan:Win32/QuarkBandit.A!dha\", \"Trojan:Win32/Sidelod.A!dha\"]);\n(union isfuzzy=true\n(CommonSecurityLog \n| where TimeGenerated >= ago(timeframe) \n| parse Message with * '(' DNSName ')' * \n| where isnotempty(FileHash)\n| where FileHash in (SHA256Hash) or DNSName in~ (DomainNames)\n| extend Account = SourceUserID, Computer = DeviceName, IPAddress = SourceIP\n),\n(DnsEvents \n| where TimeGenerated >= ago(timeframe) \n| extend DNSName = Name\n| where isnotempty(DNSName)\n| where DNSName  in~ (DomainNames)\n| extend IPAddress = ClientIP\n),\n(VMConnection \n| where TimeGenerated >= ago(timeframe) \n| parse RemoteDnsCanonicalNames with * '[\"' DNSName '\"]' *\n| where isnotempty(DNSName)\n| where DNSName  in~ (DomainNames)\n| extend IPAddress = RemoteIp\n),\n(Event\n//This query uses sysmon data depending on table name used this may need updataing\n| where TimeGenerated >= ago(3d)\n| where Source == \"Microsoft-Windows-Sysmon\"\n| extend EvData = parse_xml(EventData)\n| extend EventDetail = EvData.DataItem.EventData.Data\n| extend Hashes = EventDetail.[16].[\"#text\"]\n| parse Hashes with * 'SHA1=' SHA1 ',' * \n| where isnotempty(Hashes)\n| where Hashes in (SHA1Hash) \n| extend Account = UserName\n),\n(SecurityAlert\n| where TimeGenerated >= ago(timeframe)\n| where Entities has_any (SigNames)\n| extend Computer = tostring(parse_json(Entities)[0].HostName) \n)\n)\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IPAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Known GALLIUM domains and hashes",
+    "enabled": true,
+    "description": "GALLIUM command and control domains and hash values for tools and malware used by GALLIUM. \n Matches domain name IOCs related to the GALLIUM activity group with CommonSecurityLog, DnsEvents, VMConnection and SecurityEvents dataTypes.\n References: https://www.microsoft.com/security/blog/2019/12/12/gallium-targeting-global-telecom/ ",
+    "tactics": [
+      "CommandAndControl",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "26a3b261-b997-4374-94ea-6c37f67f4f39",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
+  },
+  {
+    "severity": "High",
+    "query": "let timeframe = 1d;\nlet SHA256Hash = \"1174fd03271f80f5e2a6435c72bdd0272a6e3a37049f6190abf125b216a83471\" ;\n(union isfuzzy=true\n(CommonSecurityLog \n| where TimeGenerated >= ago(timeframe) \n| parse Message with * '(' DNSName ')' * \n| where isnotempty(FileHash)\n| where FileHash in (SHA256Hash) \n| extend Account = SourceUserID, Computer = DeviceName, IPAddress = SourceIP\n),\n(Event\n//This query uses sysmon data depending on table name used this may need updataing\n| where TimeGenerated >= ago(3d)\n| where Source == \"Microsoft-Windows-Sysmon\"\n| extend EvData = parse_xml(EventData)\n| extend EventDetail = EvData.DataItem.EventData.Data\n| extend Hashes = EventDetail.[16].[\"#text\"]\n| parse Hashes with * 'SHA256=' SHA265 ',' * \n| where isnotempty(Hashes)\n| where Hashes in (SHA256Hash) \n| extend Account = UserName\n)\n)\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IPAddress",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Known ZINC related maldoc hash",
+    "enabled": true,
+    "description": "Document hash used by ZINC in highly targeted spear phishing campaign.",
+    "tactics": [
+      "CommandAndControl",
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "3174a9ec-d0ad-4152-8307-94ed04fa450a",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "(union isfuzzy=true (SecurityEvent \n| where EventID == 4662 \n| where ObjectServer == 'DS'\n| where OperationType == 'Object Access'\n//| where ObjectName contains '<GUID of ADFS DKM Container>' This is unique to the domain.\n| where ObjectType contains '5cb41ed0-0e4c-11d0-a286-00aa003049e2' // Contact Class\n| where Properties contains '8d3bca50-1d7e-11d0-a081-00aa006c33ed' // Picture Attribute - Ldap-Display-Name: thumbnailPhoto\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer, AccountCustomEntity = SubjectAccount),\n(DeviceEvents\n| where ActionType =~ \"LdapSearch\"\n| where AdditionalFields.AttributeList contains \"thumbnailPhoto\"\n| extend timestamp = TimeGenerated, HostCustomEntity = DeviceName, AccountCustomEntity = InitiatingProcessAccountName)\n)",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "ADFS DKM Master Key Export",
+    "enabled": true,
+    "description": "Identifies an export of the ADFS DKM Master Key from Active Directory.\n References: https://blogs.microsoft.com/on-the-issues/2020/12/13/customers-protect-nation-state-cyberattacks/, \n https://www.fireeye.com/blog/threat-research/2020/12/evasive-attacker-leverages-solarwinds-supply-chain-compromises-with-sunburst-backdoor.html?1",
+    "tactics": [
+      "Collection"
+    ],
+    "alertRuleTemplateName": "18e6a87e-9d06-4a4e-8b59-3469cd49552d",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1d;\nlet spanoftime = 10m;\nlet threshold = 0;\nSecurityEvent \n| where TimeGenerated > ago(2*timeframe) \n// A user account was enabled\n| where EventID == 4722\n| where AccountType =~ \"User\"\n| project creationTime = TimeGenerated, CreateEventID = EventID, Activity, Computer, TargetUserName, UserPrincipalName, \nAccountUsedToCreate = SubjectUserName, TargetSid, SubjectUserSid \n| join kind= inner (\n  SecurityEvent\n  | where TimeGenerated > ago(timeframe) \n  // A user account was disabled \n  | where EventID == 4725\n| where AccountType == \"User\"\n| project deletionTime = TimeGenerated, DeleteEventID = EventID, Activity, Computer, TargetUserName, UserPrincipalName, \nAccountUsedToDelete = SubjectUserName, TargetSid, SubjectUserSid \n) on Computer, TargetUserName\n| where deletionTime - creationTime < spanoftime\n| extend TimeDelta = deletionTime - creationTime\n| where tolong(TimeDelta) >= threshold\n| project TimeDelta, creationTime, CreateEventID, Computer, TargetUserName, UserPrincipalName, AccountUsedToCreate, \ndeletionTime, DeleteEventID, AccountUsedToDelete\n| extend timestamp = creationTime, AccountCustomEntity = AccountUsedToCreate, HostCustomEntity = Computer",
+    "queryFrequency": "P1D",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "User account enabled and disabled within 10 mins",
+    "enabled": true,
+    "description": "Identifies when a user account is enabled and then disabled within 10 minutes. This can be an indication of compromise and\nan adversary attempting to hide in the noise.",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "3d023f64-8225-41a2-9570-2bd7c2c4535e",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  }
+
+]
+    
+  }
