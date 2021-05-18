@@ -28,7 +28,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Common_Custom_PM/*
+          SourceFolder: Alert_Rules/Custom_common_PM/*
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:

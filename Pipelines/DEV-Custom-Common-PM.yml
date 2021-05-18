@@ -28,7 +28,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Common_PM/*
+          SourceFolder: Alert_Rules/Custom_Common_PM/*
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:
@@ -43,14 +43,14 @@ stages:
           PathtoPublish: '$(Pipeline.Workspace)'
           ArtifactName: RulesFile
 
-- stage: deploy_PRD_Coller_Capital
+- stage: deploy_DEV_Coller_Capital
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Coller_Capital
+      - group: DEV_Coller_Capital
       steps:
       - download: current
         artifact: RulesFile
@@ -59,20 +59,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Coller_Capital'
+         azureSubscription: 'DEV_Coller_Capital'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Mizuho_International
+- stage: deploy_DEV_Mizuho_International
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Mizuho_International
+      - group: DEV_Mizuho_International
       steps:
       - download: current
         artifact: RulesFile
@@ -81,20 +81,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Mizuho_International'
+         azureSubscription: 'DEV_Mizuho_International'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: -Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
          
-- stage: deploy_PRD_DAC_Beachcroft
+- stage: deploy_DEV_DAC_Beachcroft
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_DAC_Beachcroft
+      - group: DEV_DAC_Beachcroft
       steps:
       - download: current
         artifact: RulesFile
@@ -103,20 +103,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_DAC_Beachcroft'
+         azureSubscription: 'DEV_DAC_Beachcroft'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Gov_of_Jersey
+- stage: deploy_DEV_Gov_of_Jersey
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Gov_of_Jersey
+      - group: DEV_Gov_of_Jersey
       steps:
       - download: current
         artifact: RulesFile
@@ -125,20 +125,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Gov_of_Jersey'
+         azureSubscription: 'DEV_Gov_of_Jersey'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Park_Square_Capital
+- stage: deploy_DEV_Park_Square_Capital
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Park_Square_Capital
+      - group: DEV_Park_Square_Capital
       steps:
       - download: current
         artifact: RulesFile
@@ -147,20 +147,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Park_Square_Capital'
+         azureSubscription: 'DEV_Park_Square_Capital'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_3i_Group
+- stage: deploy_DEV_3i_Group
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_3i_Group
+      - group: DEV_3i_Group
       steps:
       - download: current
         artifact: RulesFile
@@ -169,20 +169,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_3i_Group'
+         azureSubscription: 'DEV_3i_Group'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_C5_Capital
+- stage: deploy_DEV_C5_Capital
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_C5_Capital
+      - group: DEV_C5_Capital
       steps:
       - download: current
         artifact: RulesFile
@@ -191,20 +191,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_C5_Capital'
+         azureSubscription: 'DEV_C5_Capital'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Essentra
+- stage: deploy_DEV_Essentra
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Essentra
+      - group: DEV_Essentra
       steps:
       - download: current
         artifact: RulesFile
@@ -213,20 +213,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Essentra'
+         azureSubscription: 'DEV_Essentra'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Oxera_Consulting
+- stage: deploy_DEV_Oxera_Consulting
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Oxera_Consulting
+      - group: DEV_Oxera_Consulting
       steps:
       - download: current
         artifact: RulesFile
@@ -235,20 +235,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Oxera_Consulting'
+         azureSubscription: 'DEV_Oxera_Consulting'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Doctors_Laboratory
+- stage: deploy_DEV_Doctors_Laboratory
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Doctors_Laboratory
+      - group: DEV_Doctors_Laboratory
       steps:
       - download: current
         artifact: RulesFile
@@ -257,20 +257,20 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Doctors_Laboratory'
+         azureSubscription: 'DEV_Doctors_Laboratory'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Annington
+- stage: deploy_DEV_Annington
   jobs:
     - job: AgentJob
       pool:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_Annington
+      - group: DEV_Annington
       steps:
       - download: current
         artifact: RulesFile
@@ -279,7 +279,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Annington'
+         azureSubscription: 'DEV_Annington'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion

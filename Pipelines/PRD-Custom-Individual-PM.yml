@@ -43,7 +43,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Individual_AM/${{parameters.customer}}
+          SourceFolder: Alert_Rules/Custom_Individual_PM/${{parameters.customer}}
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:

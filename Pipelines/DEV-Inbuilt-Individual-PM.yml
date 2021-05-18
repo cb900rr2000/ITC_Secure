@@ -5,21 +5,21 @@ parameters:
 - name: customer
   displayName: Customer
   type: string
-  default: PRD_No-Selection
+  default: DEV_No-Selection
   values:
-  - PRD_Coller_Capital
-  - PRD_Mizuho_International
-  - PRD_DAC_Beachcroft
-  - PRD_Gov_of_Jersey
-  - PRD_Park_Square_Capital
-  - PRD_3i_Group
-  - PRD_C5_Capital
-  - PRD_Essentra
-  - PRD_Oxera_Consulting
-  - PRD_Doctors_Laboratory
-  - PRD_ITC_Secure
-  - PRD_Annington
-  - PRD_No-Selection
+  - DEV_Coller_Capital
+  - DEV_Mizuho_International
+  - DEV_DAC_Beachcroft
+  - DEV_Gov_of_Jersey
+  - DEV_Park_Square_Capital
+  - DEV_3i_Group
+  - DEV_C5_Capital
+  - DEV_Essentra
+  - DEV_Oxera_Consulting
+  - DEV_Doctors_Laboratory
+  - DEV_ITC_Secure
+  - DEV_Annington
+  - DEV_No-Selection
 
 name: build and deploy Alert Rules
 resources:
@@ -43,7 +43,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Individual_AM/${{parameters.customer}}
+          SourceFolder: Alert_Rules/Inbuilt_Individual_PM/${{parameters.customer}}
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:
