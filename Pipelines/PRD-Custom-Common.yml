@@ -1,6 +1,16 @@
 # Analytics Rules build and deploy pipeline
 # This pipeline publishes the rules file as an artifact and then uses a powershell task to deploy
 
+parameters:
+- name: AM-PM
+  displayName: Alert Rule Shedule Period
+  type: string
+  default: No-Slection
+  values:
+  - AM
+  - PM
+  - No-Selection
+
 name: build and deploy Alert Rules
 resources:
  pipelines:
@@ -28,7 +38,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Common_PM/*
+          SourceFolder: Alert_Rules/Custom_Common_${{parameters.AM-PM}}/*
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:
