@@ -5,21 +5,21 @@ parameters:
 - name: customer
   displayName: Customer
   type: string
-  default: PRD_No-Selection
+  default: PRD_Custom_No-Selection
   values:
-  - PRD_Coller_Capital
-  - PRD_Mizuho_International
-  - PRD_DAC_Beachcroft
-  - PRD_Gov_of_Jersey
-  - PRD_Park_Square_Capital
-  - PRD_3i_Group
-  - PRD_C5_Capital
-  - PRD_Essentra
-  - PRD_Oxera_Consulting
-  - PRD_Doctors_Laboratory
-  - PRD_ITC_Secure
-  - PRD_Annington
-  - PRD_No-Selection
+  - PRD_Custom_Coller_Capital
+  - PRD_Custom_Mizuho_International
+  - PRD_Custom_DAC_Beachcroft
+  - PRD_Custom_Gov_of_Jersey
+  - PRD_Custom_Park_Square_Capital
+  - PRD_Custom_3i_Group
+  - PRD_Custom_C5_Capital
+  - PRD_Custom_Essentra
+  - PRD_Custom_Oxera_Consulting
+  - PRD_Custom_Doctors_Laboratory
+  - PRD_Custom_ITC_Secure
+  - PRD_Custom_Annington
+  - PRD_Custom_No-Selection
 
 - name: AM-PM
   displayName: Alert Rule Shedule Period
@@ -35,7 +35,7 @@ resources:
  pipelines:
    - pipeline: Scripts
      source: 'scriptsCI'
-trigger: 
+trigger: false
  paths:
    include:
      - Alert_Rules/* 

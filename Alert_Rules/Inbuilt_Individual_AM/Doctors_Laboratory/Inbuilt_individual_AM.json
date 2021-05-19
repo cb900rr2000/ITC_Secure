@@ -625,6 +625,410 @@
       "groupByEntities": ""
     },
     "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+
+  {
+    "severity": "Medium",
+    "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| where Active == true\n// Picking up only IOC's that contain the entities we want\n| where isnotempty(NetworkIP) or isnotempty(EmailSourceIpAddress) or isnotempty(NetworkDestinationIP) or isnotempty(NetworkSourceIP)\n// As there is potentially more than 1 indicator type for matching IP, taking NetworkIP first, then others if that is empty.\n// Taking the first non-empty value based on potential IOC match availability\n| extend TI_ipEntity = iff(isnotempty(NetworkIP), NetworkIP, NetworkDestinationIP)\n| extend TI_ipEntity = iff(isempty(TI_ipEntity) and isnotempty(NetworkSourceIP), NetworkSourceIP, TI_ipEntity)\n| extend TI_ipEntity = iff(isempty(TI_ipEntity) and isnotempty(EmailSourceIpAddress), EmailSourceIpAddress, TI_ipEntity)\n| join (\n    OfficeActivity | where TimeGenerated >= ago(dt_lookBack)\n    // renaming time column so it is clear the log this came from\n    | extend OfficeActivity_TimeGenerated = TimeGenerated\n)\non $left.TI_ipEntity == $right.ClientIP\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| project LatestIndicatorTime, Description, ActivityGroupNames, IndicatorId, ThreatType, Url, ExpirationDateTime, ConfidenceScore, OfficeActivity_TimeGenerated,\nTI_ipEntity, ClientIP, UserId, Operation, ResultStatus, RecordType, OfficeObjectId, NetworkIP, NetworkDestinationIP, NetworkSourceIP, EmailSourceIpAddress\n| extend timestamp = OfficeActivity_TimeGenerated, IPCustomEntity = ClientIP, AccountCustomEntity = UserId, URLCustomEntity = Url",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "(Preview) TI map IP entity to OfficeActivity",
+    "enabled": true,
+    "description": "Identifies a match in OfficeActivity from any IP IOC from TI",
+    "tactics": [
+      "Impact"
+    ],
+    "alertRuleTemplateName": "f15370f4-c6fa-42c5-9be4-1d308f40284e",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nlet emailregex = @'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$';\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| where Active == true\n//Filtering the table for Email related IOCs\n| where isnotempty(EmailRecipient)\n| join (\n    OfficeActivity | where TimeGenerated >= ago(dt_lookBack) and isnotempty(UserId)\n    | where UserId matches regex emailregex\n    | extend OfficeActivity_TimeGenerated = TimeGenerated\n)\non $left.EmailRecipient == $right.UserId\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| project LatestIndicatorTime, Description, ActivityGroupNames, IndicatorId, ThreatType, Url, ExpirationDateTime, ConfidenceScore, OfficeActivity_TimeGenerated,\nEmailSenderName, EmailSourceDomain, EmailSourceIpAddress, EmailSubject, FileHashValue, FileHashType, UserId, ClientIP, Operation, UserType, RecordType, OfficeWorkload, Parameters\n| extend timestamp = OfficeActivity_TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIP, URLCustomEntity = Url",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "(Preview) TI map Email entity to OfficeActivity",
+    "enabled": true,
+    "description": "Identifies a match in OfficeActivity table from any Email IOC from TI",
+    "tactics": [
+      "Impact"
+    ],
+    "alertRuleTemplateName": "4a3f5ed7-8da5-4ce2-af6f-c9ada45060f2",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| where Active == true\n// Picking up only IOC's that contain the entities we want\n| where isnotempty(Url)\n| join (\n OfficeActivity\n  | where TimeGenerated >= ago(dt_lookBack)\n  //Extract the Url from a number of potential fields\n  | extend Url = iif(OfficeWorkload == \"AzureActiveDirectory\",extract(\"(http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\\\(\\\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+);\", 1,ModifiedProperties),tostring(parse_json(ModifiedProperties)[12].NewValue))\n  | where isnotempty(Url)\n  // Ensure we get a clean URL\n  | extend Url = tostring(split(Url, ';')[0])\n  | extend Office_TimeGenerated = TimeGenerated\n  // Project a single user identity that we can use for entity mapping\n  | extend User = iif(isnotempty(UserId), UserId, iif(isnotempty(Actor), tostring(parse_json(Actor)[0].ID), tostring(parse_json(Parameters)[0].Vlaue))) \n) on Url\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| project LatestIndicatorTime, Description, ActivityGroupNames, IndicatorId, ThreatType, ExpirationDateTime, ConfidenceScore, Operation, \nUserType, OfficeWorkload, Parameters, Office_TimeGenerated, Url, User\n| extend timestamp = Office_TimeGenerated, AccountCustomEntity = User, URLCustomEntity = Url",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "(Preview) TI map URL entity to OfficeActivity data",
+    "enabled": true,
+    "description": "Identifies a match in OfficeActivity data from any URL IOC from TI",
+    "tactics": [
+      "Impact"
+    ],
+    "alertRuleTemplateName": "36a9c9e5-3dc1-4ed9-afaa-1d13617bfc2b",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Low",
+    "query": "let detectionTime = 30d;\nlet IPs = dynamic ([\"199.249.230.\",\"185.220.101.\",\"23.129.64.\",\"109.70.100.\",\"185.220.102.\"]);\nOfficeActivity\n| where TimeGenerated > ago(detectionTime)\n| where RecordType in (\"AzureActiveDirectoryAccountLogon\", \"AzureActiveDirectoryStsLogon\") \n| where Operation != 'UserLoggedIn'\n| extend UserAgent = iff(parse_json(ExtendedProperties)[0].Name =~ \"UserAgent\", extractjson(\"$[0].Value\", ExtendedProperties, typeof(string)),\"\")\n| mv-expand parse_json(ExtendedProperties)\n| where ExtendedProperties.Name =~ \"RequestType\"\n| extend RequestType = ExtendedProperties.Value\n| where ClientIP has_any (IPs)\n| summarize authAttempts=dcount(TimeGenerated), firstAttempt=min(TimeGenerated), lastAttempt=max(TimeGenerated), uniqueIPs=dcount(ClientIP), uniqueAccounts=dcount(UserId), attemptedAccounts=make_set(UserId) by UserAgent\n| where authAttempts > 2500\n| extend timestamp = firstAttempt\n| sort by uniqueAccounts",
+    "queryFrequency": "P7D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Possible STRONTIUM attempted credential harvesting",
+    "enabled": true,
+    "description": "Surfaces potential STRONTIUM group Office365 credential harvesting attempts within OfficeActivity Logon events.\nReferences: https://www.microsoft.com/security/blog/2020/09/10/strontium-detecting-new-patters-credential-harvesting/.",
+    "tactics": [
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "04384937-e927-4595-8f3c-89ff58ed231f",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let detectionTime = 30d;\nlet User_Agents = dynamic ([\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70\", \n\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.0.1 Safari/605.1.15\", \n\"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0\", \n\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36\", \n\"Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36\"]);\nOfficeActivity\n| where TimeGenerated > ago(detectionTime)\n| where RecordType in (\"AzureActiveDirectoryAccountLogon\", \"AzureActiveDirectoryStsLogon\") \n| where Operation != 'UserLoggedIn'\n| extend UserAgent = iff(parse_json(ExtendedProperties)[0].Name =~ \"UserAgent\", extractjson(\"$[0].Value\", ExtendedProperties, typeof(string)),\"\")\n| mv-expand parse_json(ExtendedProperties)\n| where ExtendedProperties.Name =~ \"RequestType\"\n| extend RequestType = todynamic(ExtendedProperties).Value\n| where UserAgent =~ \"ms-office\" or UserAgent has_any (User_Agents)\n| summarize authAttempts=dcount(TimeGenerated), firstAttempt=min(TimeGenerated), lastAttempt=max(TimeGenerated), uniqueIPs=dcount(ClientIP), uniqueAccounts=dcount(UserId), attemptedAccounts=make_set(UserId) by UserAgent\n| where authAttempts > 500\n| extend timestamp = firstAttempt\n| sort by uniqueAccounts",
+    "queryFrequency": "P7D",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Possible STRONTIUM attempted credential harvesting",
+    "enabled": true,
+    "description": "Surfaces potential STRONTIUM group Office365 credential harvesting attempts within OfficeActivity Logon events.",
+    "tactics": [
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "68271db2-cbe9-4009-b1d3-bb3b5fe5713c",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Medium",
+    "query": "let timeframe = 1h;\nlet WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-498$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1000$\";\nlet GroupAddition = SecurityEvent \n| where TimeGenerated > ago(timeframe)\n// 4728 - A member was added to a security-enabled global group\n// 4732 - A member was added to a security-enabled local group\n// 4756 - A member was added to a security-enabled universal group  \n| where EventID in (\"4728\", \"4732\", \"4756\") \n| where AccountType =~ \"User\" and MemberName == \"-\"\n// Exclude Remote Desktop Users group: S-1-5-32-555\n| where TargetSid !in (\"S-1-5-32-555\")\n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID\n| project GroupAddTime = TimeGenerated, GroupAddEventID = EventID, GroupAddActivity = Activity, GroupAddComputer = Computer, \nGroupAddTargetUserName = TargetUserName, GroupAddTargetDomainName = TargetDomainName, GroupAddTargetSid = TargetSid,  \nGroupAddSubjectUserName = SubjectUserName, GroupAddSubjectUserSid = SubjectUserSid, GroupSid = MemberSid;\nlet GroupCreated = SecurityEvent\n| where TimeGenerated > ago(timeframe)\n// 4727 - A security-enabled global group was created\n// 4731 - A security-enabled local group was created\n// 4754 - A security-enabled universal group was created\n| where EventID in (\"4727\", \"4731\", \"4754\")\n| where AccountType =~ \"User\"\n| project GroupCreateTime = TimeGenerated, GroupCreateEventID = EventID, GroupCreateActivity = Activity, GroupCreateComputer = Computer, \nGroupCreateTargetUserName = TargetUserName, GroupCreateTargetDomainName = TargetDomainName, GroupCreateSubjectUserName = SubjectUserName, \nGroupCreateSubjectDomainName = SubjectDomainName, GroupCreateSubjectUserSid = SubjectUserSid, GroupSid = TargetSid;\nGroupCreated\n| join (\nGroupAddition\n) on GroupSid \n| extend timestamp = GroupCreateTime, AccountCustomEntity = GroupCreateSubjectUserName, HostCustomEntity = GroupCreateComputer",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "PT1H",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Group added to built in domain local or global group",
+    "enabled": true,
+    "description": "Identifies when a recently created Group was added to a privileged built in domain local group or global group such as the \nEnterprise Admins, Cert Publishers or DnsAdmins.  Be sure to verify this is an expected addition.\nReferences: For AD SID mappings - https://docs.microsoft.com/windows/security/identity-protection/access-control/active-directory-security-groups.",
+    "tactics": [
+      "Persistence",
+      "PrivilegeEscalation"
+    ],
+    "alertRuleTemplateName": "a7564d76-ec6b-4519-a66b-fcc80c42332b",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let starttime = 1d;\nlet endtime = 1h;\nlet prev23hThreshold = 4;\nlet prev1hThreshold = 15;\nlet Kerbevent =\nSecurityEvent\n| where TimeGenerated >= ago(starttime)\n| where EventID == 4769\n| parse EventData with * 'TicketEncryptionType\">' TicketEncryptionType \"<\" *\n| where TicketEncryptionType == '0x17'\n| parse EventData with * 'TicketOptions\">' TicketOptions \"<\" *\n| where TicketOptions == '0x40810000'\n| parse EventData with * 'Status\">' Status \"<\" *\n| where Status == '0x0'\n| parse EventData with * 'ServiceName\">' ServiceName \"<\" *\n| where ServiceName !contains \"$\" and ServiceName !contains \"krbtgt\" \n| parse EventData with * 'TargetUserName\">' TargetUserName \"<\" *\n| where TargetUserName !contains \"$@\" and TargetUserName !contains ServiceName\n| parse EventData with * 'IpAddress\">::ffff:' ClientIPAddress \"<\" *;\nlet Kerbevent23h = Kerbevent\n| where TimeGenerated >= ago(starttime) and TimeGenerated < ago(endtime)\n| summarize ServiceNameCountPrev23h = dcount(ServiceName), ServiceNameSet23h = makeset(ServiceName) \nby Computer, TargetUserName, ClientIPAddress, TicketOptions, TicketEncryptionType, Status\n| where ServiceNameCountPrev23h < prev23hThreshold;\nlet Kerbevent1h = \nKerbevent\n| where TimeGenerated >= ago(endtime)\n| summarize min(TimeGenerated), max(TimeGenerated), ServiceNameCountPrev1h = dcount(ServiceName), ServiceNameSet1h = makeset(ServiceName) \nby Computer, TargetUserName, ClientIPAddress, TicketOptions, TicketEncryptionType, Status;\nKerbevent1h \n| join kind=leftanti\n(\nKerbevent23h\n) on TargetUserName\n// Threshold value set above is based on testing, this value may need to be changed for your environment.\n| where ServiceNameCountPrev1h > prev1hThreshold\n| project StartTimeUtc = min_TimeGenerated, EndTimeUtc = max_TimeGenerated, TargetUserName, Computer, ClientIPAddress, TicketOptions, \nTicketEncryptionType, Status, ServiceNameCountPrev1h, ServiceNameSet1h\n| extend timestamp = StartTimeUtc, AccountCustomEntity = TargetUserName, HostCustomEntity = Computer, IPCustomEntity = ClientIPAddress",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P1D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Potential Kerberoasting",
+    "enabled": true,
+    "description": "A service principal name (SPN) is used to uniquely identify a service instance in a Windows environment. \nEach SPN is usually associated with a service account. Organizations may have used service accounts with weak passwords in their environment. \nAn attacker can try requesting Kerberos ticket-granting service (TGS) service tickets for any SPN from a domain controller (DC) which contains \na hash of the Service account. This can then be used for offline cracking. This hunting query looks for accounts that are generating excessive \nrequests to different resources within the last hour compared with the previous 24 hours.  Normal users would not make an unusually large number \nof request within a small time window. This is based on 4769 events which can be very noisy so environment based tweaking might be needed.",
+    "tactics": [
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "1572e66b-20a7-4012-9ec4-77ec4b101bc8",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let starttime = 14d;\nlet endtime = 1d;\nlet timeframe = 1h;\nlet TotalEventsThreshold = 5;\nlet ExeList = dynamic([\"powershell.exe\",\"cmd.exe\",\"wmic.exe\",\"psexec.exe\",\"cacls.exe\",\"rundll.exe\"]);\nlet TimeSeriesData = \nSecurityEvent\n| where EventID == 4688 | extend Process = tolower(Process)\n| where TimeGenerated between (startofday(ago(starttime))..startofday(ago(endtime)))\n| where Process in (ExeList)\n| project TimeGenerated, Computer, AccountType, Account, Process\n| make-series Total=count() on TimeGenerated from ago(starttime) to ago(endtime) step timeframe by Process;\nlet TimeSeriesAlerts = TimeSeriesData\n| extend (anomalies, score, baseline) = series_decompose_anomalies(Total, 1.5, -1, 'linefit')\n| mv-expand Total to typeof(double), TimeGenerated to typeof(datetime), anomalies to typeof(double), score to typeof(double), baseline to typeof(long)\n| where anomalies > 0\n| project Process, TimeGenerated, Total, baseline, anomalies, score\n| where Total > TotalEventsThreshold;\nTimeSeriesAlerts\n| join (\nSecurityEvent\n| where EventID == 4688 | extend Process = tolower(Process)\n| summarize CommandlineCount = count() by bin(TimeGenerated, 1h), Process, CommandLine, Computer, Account\n) on Process, TimeGenerated \n| project AnomalyHour = TimeGenerated, Computer, Account, Process, CommandLine, CommandlineCount, Total, baseline, anomalies, score \n| extend timestamp = AnomalyHour, AccountCustomEntity = Account, HostCustomEntity = Computer",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Process execution frequency anomaly",
+    "enabled": true,
+    "description": "Identifies anomalous spike in frequency of executions of sensitive processes which are often leveraged as attack vectors. \nThe query leverages KQL built-in anomaly detection algorithms to find large deviations from baseline patterns. \nSudden increases in execution frequency of sensitive processes should be further investigated for malicious activity.\nTune the values from 1.5 to 3 in series_decompose_anomalies for further outliers or based on custom threshold values for score.",
+    "tactics": [
+      "Execution"
+    ],
+    "alertRuleTemplateName": "2c55fe7a-b06f-4029-a5b9-c54a2320d7b8",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Low",
+    "query": "let timeRange = 6h;\nlet authenticationWindow = 1h;\nlet authenticationThreshold = 5;\nSecurityEvent\n| where TimeGenerated > ago(timeRange)\n| where EventID == 4624 or EventID == 4625\n| where IpAddress != \"-\" and isnotempty(Account)\n| extend Outcome = iff(EventID == 4624, \"Success\", \"Failure\")\n// bin outcomes into 5 minute windows to reduce the volume of data\n| summarize OutcomeCount=count() by Account, IpAddress, Computer, Outcome, bin(TimeGenerated, 5m)\n| project TimeGenerated, Account, IpAddress, Computer, Outcome, OutcomeCount\n// sort ready for sessionizing - by account and time of the authentication outcome\n| sort by Account asc, TimeGenerated asc\n| serialize \n// sessionize into failure groupings until either the account changes or there is a success\n| extend SessionStartedUtc = row_window_session(TimeGenerated, timeRange, authenticationWindow, Account != prev(Account) or prev(Outcome) == \"Success\")\n// count the failures in each session\n| summarize FailureCountBeforeSuccess=sumif(OutcomeCount, Outcome == \"Failure\"), StartTime=min(TimeGenerated), EndTime=max(TimeGenerated), makelist(Outcome), makeset(Computer), makeset(IpAddress) by SessionStartedUtc, Account\n// the session must not start with a success, and must end with one\n| where array_index_of(list_Outcome, \"Success\") != 0\n| where array_index_of(list_Outcome, \"Success\") == array_length(list_Outcome) - 1\n| project-away SessionStartedUtc, list_Outcome \n// where the number of failures before the success is above the threshold \n| where FailureCountBeforeSuccess >= authenticationThreshold\n// expand out ip and computer for customer entity assignment\n| mvexpand set_IpAddress, set_Computer\n| extend IpAddress = tostring(set_IpAddress), Computer = tostring(set_Computer)\n| extend timestamp=StartTime, AccountCustomEntity=Account, HostCustomEntity=Computer, IPCustomEntity=IpAddress",
+    "queryFrequency": "PT6H",
+    "queryPeriod": "PT6H",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "SecurityEvent - Multiple authentication failures followed by a success",
+    "enabled": true,
+    "description": "Identifies accounts who have failed to logon to the domain multiple times in a row, followed by a successful authentication\nwithin a short time frame. Multiple failed attempts followed by a success can be an indication of a brute force attempt or\npossible mis-configuration of a service account within an environment.\nThe lookback is set to 6h and the authentication window and threshold are set to 1h and 5, meaning we need to see a minimum\nof 5 failures followed by a success for an account within 1 hour to surface an alert.",
+    "tactics": [
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "cf3ede88-a429-493b-9108-3e46d3c741f7",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Low",
+    "query": "let timeframe = 10m;\nlet threshold = 20;\nSecurityEvent \n| where TimeGenerated >= ago(timeframe)\n| where EventID == 4625\n| where AccountType =~ \"User\"\n| where SubStatus !='0xc0000064' and Account !in ('\\\\', '-\\\\-')\n// SubStatus '0xc0000064' signifies 'Account name does not exist'\n| extend ResourceId = column_ifexists(\"_ResourceId\", _ResourceId), SourceComputerId = column_ifexists(\"SourceComputerId\", SourceComputerId)\n| extend Reason = case(\nSubStatus =~ '0xC000005E', 'There are currently no logon servers available to service the logon request.',\nSubStatus =~ '0xC0000064', 'User logon with misspelled or bad user account',\nSubStatus =~ '0xC000006A', 'User logon with misspelled or bad password', \nSubStatus =~ '0xC000006D', 'Bad user name or password',\nSubStatus =~ '0xC000006E', 'Unknown user name or bad password',\nSubStatus =~ '0xC000006F', 'User logon outside authorized hours',\nSubStatus =~ '0xC0000070', 'User logon from unauthorized workstation',\nSubStatus =~ '0xC0000071', 'User logon with expired password',\nSubStatus =~ '0xC0000072', 'User logon to account disabled by administrator',\nSubStatus =~ '0xC00000DC', 'Indicates the Sam Server was in the wrong state to perform the desired operation', \nSubStatus =~ '0xC0000133', 'Clocks between DC and other computer too far out of sync',\nSubStatus =~ '0xC000015B', 'The user has not been granted the requested logon type (aka logon right) at this machine',\nSubStatus =~ '0xC000018C', 'The logon request failed because the trust relationship between the primary domain and the trusted domain failed',\nSubStatus =~ '0xC0000192', 'An attempt was made to logon, but the Netlogon service was not started',\nSubStatus =~ '0xC0000193', 'User logon with expired account',\nSubStatus =~ '0xC0000224', 'User is required to change password at next logon',\nSubStatus =~ '0xC0000225', 'Evidently a bug in Windows and not a risk',\nSubStatus =~ '0xC0000234', 'User logon with account locked',\nSubStatus =~ '0xC00002EE', 'Failure Reason: An Error occurred during Logon',\nSubStatus =~ '0xC0000413', 'Logon Failure: The machine you are logging onto is protected by an authentication firewall. The specified account is not allowed to authenticate to the machine',\nstrcat('Unknown reason substatus: ', SubStatus))\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), FailedLogonCount = count() by EventID, \nActivity, Computer, Account, TargetAccount, TargetUserName, TargetDomainName, \nLogonType, LogonTypeName, LogonProcessName, Status, SubStatus, Reason, ResourceId, SourceComputerId, WorkstationName, IpAddress\n| where FailedLogonCount >= threshold\n| extend timestamp = StartTime, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress",
+    "queryFrequency": "PT10M",
+    "queryPeriod": "PT10M",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "Failed logon attempts by valid accounts within 10 mins",
+    "enabled": true,
+    "description": "Identifies when failed logon attempts are 20 or higher during a 10 minute period (2 failed logons per minute minimum) from valid account.",
+    "tactics": [
+      "CredentialAccess"
+    ],
+    "alertRuleTemplateName": "0777f138-e5d8-4eab-bec1-e11ddfbc2be2",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Medium",
+    "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| where Active == true\n| where isnotempty(FileHashValue)\n|  join (\n  SecurityEvent | where TimeGenerated >= ago(dt_lookBack)\n      | where EventID in (\"8003\",\"8002\",\"8005\")\n      | where isnotempty(FileHash)\n      | extend SecurityEvent_TimeGenerated = TimeGenerated, Event = EventID\n)\non $left.FileHashValue == $right.FileHash\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| project LatestIndicatorTime, Description, ActivityGroupNames, IndicatorId, ThreatType, Url, ExpirationDateTime, ConfidenceScore,\nSecurityEvent_TimeGenerated, Process, FileHash, Computer, Account, Event\n| extend timestamp = SecurityEvent_TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, URLCustomEntity = Url",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "(Preview) TI map File Hash to Security Event",
+    "enabled": true,
+    "description": "Identifies a match in Security Event data from any File Hash IOC from TI",
+    "tactics": [
+      "Impact"
+    ],
+    "alertRuleTemplateName": "a7427ed7-04b4-4e3b-b323-08b981b9b4bf",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Medium",
+    "query": "let dt_lookBack = 1h;\nlet ioc_lookBack = 14d;\nlet emailregex = @'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$';\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| where Active == true\n//Filtering the table for Email related IOCs\n| where isnotempty(EmailRecipient)\n| join (\n    SecurityEvent | where TimeGenerated >= ago(dt_lookBack) and isnotempty(TargetUserName)\n    //Normalizing the column to lower case for exact match with EmailRecipient column\n    | extend TargetUserName = tolower(TargetUserName)\n    // renaming timestamp column so it is clear the log this came from SecurityEvent table\n    | extend SecurityEvent_TimeGenerated = TimeGenerated\n)\non $left.EmailRecipient == $right.TargetUserName\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| project LatestIndicatorTime, Description, ActivityGroupNames, IndicatorId, ThreatType, Url, ExpirationDateTime, ConfidenceScore, SecurityEvent_TimeGenerated,\nEmailSenderName, EmailSourceDomain, EmailSourceIpAddress, EmailSubject, FileHashValue, FileHashType, Computer, EventID, TargetUserName, Activity, IpAddress, AccountType,\nLogonTypeName, LogonProcessName, Status, SubStatus\n| extend timestamp = SecurityEvent_TimeGenerated, AccountCustomEntity = TargetUserName, IPCustomEntity = IpAddress, HostCustomEntity = Computer, URLCustomEntity = Url",
+    "queryFrequency": "PT1H",
+    "queryPeriod": "P14D",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "displayName": "(Preview) TI map Email entity to SecurityEvent",
+    "enabled": true,
+    "description": "Identifies a match in SecurityEvent table from any Email IOC from TI",
+    "tactics": [
+      "Impact"
+    ],
+    "alertRuleTemplateName": "2fc5d810-c9cc-491a-b564-841427ae0e50",
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": false,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
+  },
+  {
+    "severity": "Low",
+    "query": "Syslog\r\n| where Computer contains \"eu-west\"\r\n| where SyslogMessage contains \"new alert\"\r\n| extend todecimal(IN_Alert_Severity_CF)\r\n| where IN_Alert_Severity_CF >= 500 and IN_Alert_Severity_CF < 900",
+    "queryFrequency": "PT30M",
+    "queryPeriod": "PT30M",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "AlertPerResult"
+    },
+    "displayName": "IronNet Alert with Score 500-900",
+    "enabled": true,
+    "description": "IronNet alerts from Host. This will capture all alerts within the severity score 500-900",
+    "tactics": [],
+    "alertRuleTemplateName": null,
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": true,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": ""
+  },
+  {
+    "severity": "Medium",
+    "query": "Syslog\r\n| where Computer contains \"eu-west\"\r\n| where SyslogMessage contains \"new alert\"\r\n| extend todecimal(IN_Alert_Severity_CF)\r\n| where IN_Alert_Severity_CF >= 900",
+    "queryFrequency": "PT30M",
+    "queryPeriod": "PT30M",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT5H",
+    "suppressionEnabled": false,
+    "eventGroupingSettings": {
+      "aggregationKind": "AlertPerResult"
+    },
+    "displayName": "IronNet Alert with Score Over 900",
+    "enabled": true,
+    "description": "Tiggers when an alert with a score 900 or greater triggers from IronNet",
+    "tactics": [],
+    "alertRuleTemplateName": null,
+    "createIncident": true,
+    "groupingConfiguration": {
+      "enabled": true,
+      "reopenClosedIncident": false,
+      "lookbackDuration": "PT5H",
+      "entitiesMatchingMethod": "All",
+      "groupByEntities": ""
+    },
+    "playbookName": "TDL-LAPP-SNOW-SEV3-NON-PROD"
   }
 
 ]

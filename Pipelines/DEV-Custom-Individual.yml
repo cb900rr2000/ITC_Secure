@@ -5,21 +5,21 @@ parameters:
 - name: customer
   displayName: Customer
   type: string
-  default: DEV_No-Selection
+  default: DEV_Custom_No-Selection
   values:
-  - DEV_Coller_Capital
-  - DEV_Mizuho_International
-  - DEV_DAC_Beachcroft
-  - DEV_Gov_of_Jersey
-  - DEV_Park_Square_Capital
-  - DEV_3i_Group
-  - DEV_C5_Capital
-  - DEV_Essentra
-  - DEV_Oxera_Consulting
-  - DEV_Doctors_Laboratory
-  - DEV_ITC_Secure
-  - DEV_Annington
-  - DEV_No-Selection
+  - DEV_Custom_Coller_Capital
+  - DEV_Custom_Mizuho_International
+  - DEV_Custom_DAC_Beachcroft
+  - DEV_Custom_Gov_of_Jersey
+  - DEV_Custom_Park_Square_Capital
+  - DEV_Custom_3i_Group
+  - DEV_Custom_C5_Capital
+  - DEV_Custom_Essentra
+  - DEV_Custom_Oxera_Consulting
+  - DEV_Custom_Doctors_Laboratory
+  - DEV_Custom_ITC_Secure
+  - DEV_Custom_Annington
+  - DEV_Custom_No-Selection
 
 - name: AM-PM
   displayName: Alert Rule Shedule Period
@@ -35,7 +35,7 @@ resources:
  pipelines:
    - pipeline: Scripts
      source: 'scriptsCI'
-trigger: 
+trigger: false
  paths:
    include:
      - Alert_Rules/* 
