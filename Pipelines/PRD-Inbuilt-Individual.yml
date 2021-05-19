@@ -21,7 +21,7 @@ parameters:
   - PRD_Inbuilt_Annington
   - PRD_Inbuilt_No-Selection
 
-- name: AM-PM
+- name: AMPM
   displayName: Alert Rule Shedule Period
   type: string
   default: No-Slection
@@ -35,7 +35,7 @@ resources:
  pipelines:
    - pipeline: Scripts
      source: 'scriptsCI'
-trigger: false
+trigger:
  paths:
    include:
      - Alert_Rules/* 
@@ -52,7 +52,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Individual_${{parameters.AM-PM}}/${{parameters.customer}}
+          SourceFolder: Alert_Rules/Inbuilt_Individual_${{parameters.AMPM}}/${{parameters.customer}}
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:

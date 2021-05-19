@@ -2,7 +2,7 @@
 # This pipeline publishes the rules file as an artifact and then uses a powershell task to deploy
 
 parameters:
-- name: AM-PM
+- name: AMPM
   displayName: Alert Rule Shedule Period
   type: string
   default: No-Slection
@@ -38,7 +38,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Common_${{parameters.AM-PM}}/*
+          SourceFolder: Alert_Rules/Inbuilt_Common_${{parameters.AMPM}}/*
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:
