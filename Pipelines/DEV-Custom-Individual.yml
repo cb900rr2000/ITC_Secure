@@ -5,21 +5,21 @@ parameters:
 - name: customer
   displayName: Customer
   type: string
-  default: DEV_Custom_No-Selection
+  default: No-Selection
   values:
-  - DEV_Custom_Coller_Capital
-  - DEV_Custom_Mizuho_International
-  - DEV_Custom_DAC_Beachcroft
-  - DEV_Custom_Gov_of_Jersey
-  - DEV_Custom_Park_Square_Capital
-  - DEV_Custom_3i_Group
-  - DEV_Custom_C5_Capital
-  - DEV_Custom_Essentra
-  - DEV_Custom_Oxera_Consulting
-  - DEV_Custom_Doctors_Laboratory
-  - DEV_Custom_ITC_Secure
-  - DEV_Custom_Annington
-  - DEV_Custom_No-Selection
+  - Coller_Capital
+  - Mizuho_International
+  - DAC_Beachcroft
+  - Gov_of_Jersey
+  - Park_Square_Capital
+  - 3i_Group
+  - C5_Capital
+  - Essentra
+  - Oxera_Consulting
+  - Doctors_Laboratory
+  - ITC_Secure
+  - Annington
+  - No-Selection
 
 - name: AMPM
   displayName: Alert Rule Shedule Period
@@ -74,7 +74,7 @@ stages:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: ${{parameters.customer}}
+      - group: DEV_Custom_${{parameters.customer}}
       steps:
       - download: current
         artifact: RulesFile

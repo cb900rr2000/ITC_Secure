@@ -5,21 +5,21 @@ parameters:
 - name: customer
   displayName: Customer
   type: string
-  default: PRD_Inbuilt_No-Selection
+  default: No-Selection
   values:
-  - PRD_Inbuilt_Coller_Capital
-  - PRD_Inbuilt_Mizuho_International
-  - PRD_Inbuilt_DAC_Beachcroft
-  - PRD_Inbuilt_Gov_of_Jersey
-  - PRD_Inbuilt_Park_Square_Capital
-  - PRD_Inbuilt_3i_Group
-  - PRD_Inbuilt_C5_Capital
-  - PRD_Inbuilt_Essentra
-  - PRD_Inbuilt_Oxera_Consulting
-  - PRD_Inbuilt_Doctors_Laboratory
-  - PRD_Inbuilt_ITC_Secure
-  - PRD_Inbuilt_Annington
-  - PRD_Inbuilt_No-Selection
+  - Coller_Capital
+  - Mizuho_International
+  - DAC_Beachcroft
+  - Gov_of_Jersey
+  - Park_Square_Capital
+  - 3i_Group
+  - C5_Capital
+  - Essentra
+  - Oxera_Consulting
+  - Doctors_Laboratory
+  - ITC_Secure
+  - Annington
+  - No-Selection
 
 - name: AMPM
   displayName: Alert Rule Shedule Period
@@ -74,7 +74,7 @@ stages:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: ${{parameters.customer}}
+      - group: DEV_Inbuilt_${{parameters.customer}}
       steps:
       - download: current
         artifact: RulesFile

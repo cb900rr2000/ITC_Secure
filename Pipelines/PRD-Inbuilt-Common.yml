@@ -75,7 +75,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Mizuho_International
+- stage: deploy_Mizuho_International
   jobs:
     - job: AgentJob
       pool:
@@ -97,7 +97,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
          
-- stage: deploy_PRD_Inbuilt_DAC_Beachcroft
+- stage: deploy_DAC_Beachcroft
   jobs:
     - job: AgentJob
       pool:
@@ -119,7 +119,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Gov_of_Jersey
+- stage: deploy_Gov_of_Jersey
   jobs:
     - job: AgentJob
       pool:
@@ -141,7 +141,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Park_Square_Capital
+- stage: deploy_Park_Square_Capital
   jobs:
     - job: AgentJob
       pool:
@@ -163,7 +163,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_3i_Group
+- stage: deploy_3i_Group
   jobs:
     - job: AgentJob
       pool:
@@ -185,7 +185,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_C5_Capital
+- stage: deploy_C5_Capital
   jobs:
     - job: AgentJob
       pool:
@@ -207,7 +207,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Essentra
+- stage: deploy_Essentra
   jobs:
     - job: AgentJob
       pool:
@@ -229,7 +229,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Oxera_Consulting
+- stage: deploy_Oxera_Consulting
   jobs:
     - job: AgentJob
       pool:
@@ -251,7 +251,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Doctors_Laboratory
+- stage: deploy_Doctors_Laboratory
   jobs:
     - job: AgentJob
       pool:
@@ -273,7 +273,7 @@ stages:
          azurePowerShellVersion: LatestVersion
          pwsh: true
 
-- stage: deploy_PRD_Inbuilt_Annington
+- stage: deploy_Annington
   jobs:
     - job: AgentJob
       pool:
