@@ -69,7 +69,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Coller_Capital'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -91,7 +91,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Mizuho_International'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: -Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -104,7 +104,7 @@ stages:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_DAC_Custom_Beachcroft
+      - group: PRD_Custom_DAC_Beachcroft
       steps:
       - download: current
         artifact: RulesFile
@@ -113,7 +113,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_DAC_Custom_Beachcroft'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -135,7 +135,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Gov_of_Jersey'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -157,7 +157,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Park_Square_Capital'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -179,7 +179,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_3i_Group'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -192,7 +192,7 @@ stages:
        name: Azure Pipelines
        vmImage: 'windows-2019'
       variables: 
-      - group: PRD_C5_Custom_Capital
+      - group: PRD_Custom_C5_Capital
       steps:
       - download: current
         artifact: RulesFile
@@ -201,7 +201,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_C5_Custom_Capital'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -223,7 +223,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Essentra'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -245,7 +245,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Oxera_Consulting'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -267,7 +267,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Doctors_Laboratory'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -289,7 +289,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'PRD_Custom_Annington'
+         azureSubscription: 'PRD_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion

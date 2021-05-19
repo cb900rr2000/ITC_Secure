@@ -69,7 +69,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Coller_Capital'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -91,7 +91,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Mizuho_International'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: -Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -113,7 +113,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_DAC_Beachcroft'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -135,7 +135,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Gov_of_Jersey'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -157,7 +157,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Park_Square_Capital'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -179,7 +179,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_3i_Group'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -201,7 +201,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_C5_Capital'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -223,7 +223,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Essentra'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -245,7 +245,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Oxera_Consulting'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -267,7 +267,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Doctors_Laboratory'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
@@ -289,7 +289,7 @@ stages:
       - task: AzurePowerShell@4
         displayName: 'Create and Update Alert Rules'
         inputs:
-         azureSubscription: 'DEV_Custom_Annington'
+         azureSubscription: 'DEV_Custom_SPN'
          ScriptPath: '$(Pipeline.Workspace)/Scripts/Scripts/CreateAnalyticsRules.ps1'
          ScriptArguments: '-Workspace $(Workspace)'
          azurePowerShellVersion: LatestVersion
