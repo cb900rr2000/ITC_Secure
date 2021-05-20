@@ -38,7 +38,7 @@ stages:
        - task: CopyFiles@2
          displayName: 'Copy Alert Rules'
          inputs:
-          SourceFolder: Alert_Rules/Inbuilt_Common_${{parameters.AMPM}}/*
+          SourceFolder: Alert_Rules/Inbuilt_Common_${{parameters.AMPM}}
           TargetFolder: '$(Pipeline.Workspace)'
        - task: Files-Validator@1
          inputs:

@@ -2,32 +2,32 @@
     "Scheduled": [
 
 {
-    "severity": "Medium",
-    "query": "Syslog\r\n| where Computer contains \"eu-west\"",
-    "queryFrequency": "P1D",
-    "queryPeriod": "P1D",
-    "triggerOperator": "LessThan",
-    "triggerThreshold": 1,
-    "suppressionDuration": "PT5H",
-    "suppressionEnabled": false,
-    "eventGroupingSettings": {
-      "aggregationKind": "SingleAlert"
-    },
-    "displayName": "v001 No IRONNET Logs received for over 24 hours",
-    "enabled": true,
-    "description": "Asset quiet - runs every 24 hours. \nChecks for logs received from Ironnet and alerts if no logs have been received in the last 24 hours.  ",
-    "tactics": [],
-    "alertRuleTemplateName": null,
-    "createIncident": true,
-    "groupingConfiguration": {
-      "enabled": false,
-      "reopenClosedIncident": false,
-      "lookbackDuration": "PT5H",
-      "entitiesMatchingMethod": "All",
-      "groupByEntities": ""
-    },
-    "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
-  }
+  "severity": "Medium",
+  "query": "workspace('itc-sec-uks-law-dev-lighthouse-doctors').Syslog\r\n| where Computer contains \"eu-west\"",
+  "queryFrequency": "P1D",
+  "queryPeriod": "P1D",
+  "triggerOperator": "LessThan",
+  "triggerThreshold": 1,
+  "suppressionDuration": "PT1H",
+  "suppressionEnabled": false,
+  "eventGroupingSettings": {
+    "aggregationKind": "SingleAlert"
+  },
+  "displayName": "v001 No IRONNET Logs received for over 24 hours",
+  "enabled": true,
+  "description": "Asset quiet - runs every 24 hours. \nChecks for logs received from Ironnet and alerts if no logs have been received in the last 24 hours.  ",
+  "tactics": [],
+  "alertRuleTemplateName": null,
+  "createIncident": true,
+  "groupingConfiguration": {
+    "enabled": false,
+    "reopenClosedIncident": false,
+    "lookbackDuration": "PT5H",
+    "entitiesMatchingMethod": "All",
+    "groupByEntities": []
+  },
+  "playbookName": "TDL-LAPP-SNOW-SEV2-NON-PROD"
+}
 
 ]
     
